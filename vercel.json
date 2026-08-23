@@ -3,7 +3,7 @@
   "devCommand": "http-server public -p 3000",
   "installCommand": "npm install",
   "framework": "static",
-  "public": "public",
+  "outputDirectory": "public",
   "name": "area52-uni",
   "env": {
     "FIREBASE_API_KEY": "@firebase_api_key",
