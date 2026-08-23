@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área 52 UNI - Centro de Asesoría y Preparación Académica</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,200,150,0.2);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .alien-icon {
+            font-size: 1.5rem;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 2rem;
+            transition: color 0.3s;
+        }
+
+        nav a:hover {
+            color: #00c896;
+        }
+
+        .social-icons {
+            display: flex;
+            gap: 1rem;
+            margin-left: auto;
+        }
+
+        .social-icons a {
+            color: white;
+            font-size: 1.3rem;
+            text-decoration: none;
+            transition: transform 0.3s;
+            margin-left: 0;
+        }
+
+        .social-icons a:hover {
+            transform: scale(1.2);
+            color: #00c896;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #0f3460 0%, #1a1a2e 50%, #16213e 100%);
+            color: white;
+            padding: 5rem 2rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .highlight {
+            color: #00c896;
+            font-weight: bold;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            margin: 0.5rem;
+            border: 2px solid #00c896;
+            background: transparent;
+            color: #00c896;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: all 0.3s;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: #00c896;
+            color: #0f3460;
+        }
+
+        .btn-primary {
+            background: #00c896;
+            color: #0f3460;
+            border-color: #00c896;
+        }
+
+        .btn-primary:hover {
+            background: #00a876;
+            border-color: #00a876;
+        }
+
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+            padding: 3rem 2rem;
+            background: white;
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .badge-icon {
+            font-size: 2rem;
+        }
+
+        .section {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #1a1a2e;
+        }
+
+        .section p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 3rem;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 12px;
+            border-left: 4px solid #00c896;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,200,150,0.15);
+        }
+
+        .feature-card h3 {
+            color: #0f3460;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .feature-card p {
+            text-align: left;
+            color: #666;
+        }
+
+        .media-section {
+            background: #f0f4f8;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .video-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .video-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .pricing {
+            background: white;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .pricing-card:hover {
+            border-color: #00c896;
+            box-shadow: 0 10px 25px rgba(0,200,150,0.15);
+        }
+
+        .pricing-card.featured {
+            border-color: #00c896;
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,200,150,0.2);
+        }
+
+        .pricing-card.featured::before {
+            content: "MÁS ELEGIDO";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #00c896;
+            color: white;
+            padding: 0.3rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .price {
+            font-size: 2.5rem;
+            color: #00c896;
+            margin: 1rem 0;
+            font-weight: bold;
+        }
+
+        .price-period {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .pricing-card ul {
+            list-style: none;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .pricing-card li {
+            padding: 0.5rem 0;
+            color: #666;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .pricing-card li:last-child {
+            border-bottom: none;
+        }
+
+        .pricing-card li::before {
+            content: "✓ ";
+            color: #00c896;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .testimonials {
+            background: #f8f9fa;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .testimonial {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .testimonial-author {
+            font-weight: bold;
+            color: #0f3460;
+            margin-top: 1rem;
+        }
+
+        .stars {
+            color: #ffc107;
+            margin-bottom: 1rem;
+        }
+
+        .join-section {
+            background: linear-gradient(135deg, #00c896 0%, #00a876 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .join-section h2 {
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .join-section p {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            color: rgba(255,255,255,0.95);
+        }
+
+        footer {
+            background: #1a1a2e;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+
+        footer p {
+            margin: 0.5rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            nav {
+                display: none;
+            }
+
+            .social-icons {
+                gap: 0.5rem;
+            }
+
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+
+            .badges {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="alien-icon">👽</span>
+            <div style="text-align: left;">
+                <div style="font-size: 1.2rem;">Área 52 UNI</div>
+                <div style="font-size: 0.75rem; opacity: 0.8;">San Martín de Porres</div>
+            </div>
+        </div>
+        <nav>
+            <a href="#features">Servicios</a>
+            <a href="#pricing">Planes</a>
+            <a href="#join">Contacto</a>
+        </nav>
+        <div class="social-icons">
+            <a href="https://www.instagram.com/acad_area52/" target="_blank" title="Instagram">📸</a>
+            <a href="https://www.facebook.com/p/AREA-52-UNI-100092290451032/" target="_blank" title="Facebook">👤</a>
+            <a href="https://www.tiktok.com/@area52uni" target="_blank" title="TikTok">🎵</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>Centro de Asesoría UNI <span class="highlight">Garantizado</span></h1>
+        <p>Ubicado en San Martín de Porres, somos tu puente hacia la Universidad Nacional de Ingeniería. Clases con profesores de la UNI, cursos de ciencias y matemáticas, a nivel preuniversitario y universitario.</p>
+        <div>
+            <button class="btn btn-primary">WhatsApp: 933 884 059</button>
+            <button class="btn">Ver Servicios</button>
+        </div>
+    </section>
+
+    <section class="badges">
+        <div class="badge">
+            <span class="badge-icon">👨‍🏫</span>
+            <span>Profesores UNI</span>
+        </div>
+        <div class="badge">
+            <span class="badge-icon">📍</span>
+            <span>San Martín de Porres</span>
+        </div>
+        <div class="badge">
+            <span class="badge-icon">📱</span>
+            <span>Virtual y Presencial</span>
+        </div>
+        <div class="badge">
+            <span class="badge-icon">✓</span>
+            <span>Desde Escolar a Universitario</span>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <h2>Servicios Académicos <span class="highlight">Especializados</span></h2>
+        <p>Todo lo que necesitas para tu transición académica, desde la escuela hacia la universidad.</p>
+        
+        <div class="features">
+            <div class="feature-card">
+                <h3>📚 Clases Preuniversitarias</h3>
+                <p>Preparación completa a nivel escolar con metodología orientada al ingreso a la UNI.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🧮 Cursos de Matemáticas</h3>
+                <p>Apoyo especializado en Cálculo (I, II, III, IV), Física y Álgebra Lineal para nivel universitario.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔬 Ciencias Superiores</h3>
+                <p>Cursos de ciencias avanzadas diseñados para estudiantes universitarios de ingeniería.</p>
+            </div>
+            <div class="feature-card">
+                <h3>👨‍🏫 Plana Docente UNI</h3>
+                <p>Profesores de la Universidad Nacional de Ingeniería con experiencia y dedicación probada.</p>
+            </div>
+            <div class="feature-card">
+                <h3>💻 Clases Virtuales y Presenciales</h3>
+                <p>Flexibilidad en el formato de estudio. Elige la modalidad que mejor se adapte a tu horario.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🎯 Seguimiento Personalizado</h3>
+                <p>Tutorías dirigidas a tus necesidades específicas. Un equipo dedicado a tu éxito académico.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="media-section">
+        <h2>Tutorías de Matemática en Vivo</h2>
+        <p>Nuestros profesores de la UNI explicando Cálculo, Física y Álgebra Lineal de forma clara y didáctica</p>
+        <div class="video-container">
+            <iframe src="https://www.youtube.com/embed/o9KZx-_3eSc?controls=1" allowfullscreen></iframe>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>Lo que dicen nuestros estudiantes</h2>
+        <div class="testimonials">
+            <div class="testimonial">
+                <div class="stars">★★★★★</div>
+                <p>"Los profesores de Área 52 que son de la UNI explican de forma que realmente entiendes. Ingresé a Ingeniería Civil gracias a su preparación."</p>
+                <div class="testimonial-author">- Pedro Sánchez, Ingresante 2024</div>
+            </div>
+            <div class="testimonial">
+                <div class="stars">★★★★★</div>
+                <p>"Necesitaba apoyo en Cálculo III y los tutores de Área 52 me ayudaron a entender conceptos que parecían imposibles. Ahora paso mis cursos!"</p>
+                <div class="testimonial-author">- Laura Díaz, Estudiante UNI</div>
+            </div>
+            <div class="testimonial">
+                <div class="stars">★★★★★</div>
+                <p>"Desde preuniversitario hasta cursos universitarios, Área 52 fue mi aliado. El ambiente de estudio es increíble y los profesores siempre disponibles."</p>
+                <div class="testimonial-author">- Juan Rodríguez, Ingresante 2023</div>
+            </div>
+        </div>
+    </section>
+
+    <section style="background: linear-gradient(135deg, #f0f4f8 0%, #e8f1f7 100%); padding: 3rem 2rem; text-align: center;">
+        <h2 style="color: #1a1a2e; margin-bottom: 1rem;">Síguenos en Redes Sociales</h2>
+        <p style="color: #666; margin-bottom: 2rem; font-size: 1.05rem;">Recibe tips de estudio, consejos para tu preparación universitaria y noticias sobre nuestras clases en vivo</p>
+        <div style="display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; max-width: 600px; margin: 0 auto;">
+            <a href="https://www.instagram.com/acad_area52/" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.5rem; background: white; border: 2px solid #E4405F; color: #E4405F; text-decoration: none; border-radius: 50px; font-weight: bold; transition: all 0.3s;" onmouseover="this.style.background='#E4405F'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#E4405F';">📸 Instagram</a>
+            <a href="https://www.facebook.com/p/AREA-52-UNI-100092290451032/" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.5rem; background: white; border: 2px solid #1877F2; color: #1877F2; text-decoration: none; border-radius: 50px; font-weight: bold; transition: all 0.3s;" onmouseover="this.style.background='#1877F2'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#1877F2';">👤 Facebook</a>
+            <a href="https://www.tiktok.com/@area52uni" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.5rem; background: white; border: 2px solid #25F4EE; color: #25F4EE; text-decoration: none; border-radius: 50px; font-weight: bold; transition: all 0.3s;" onmouseover="this.style.background='#25F4EE'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#25F4EE';">🎵 TikTok</a>
+        </div>
+    </section>
+
+    <section id="pricing" class="section pricing">
+        <h2>Planes y Servicios <span class="highlight">Flexibles</span></h2>
+        <p>Elige el plan que se adapte a tu nivel académico y disponibilidad.</p>
+        
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Preparación Preuniversitaria</h3>
+                <div class="price">Consultar<span class="price-period">mensual</span></div>
+                <p style="color: #666; font-size: 0.9rem;">Clases virtuales y presenciales para escolares.</p>
+                <ul>
+                    <li>Clases semanales en vivo</li>
+                    <li>Acceso a material de estudio</li>
+                    <li>Seguimiento personalizado</li>
+                    <li>Flexibilidad horaria</li>
+                </ul>
+                <button class="btn">Contactar por WhatsApp</button>
+            </div>
+            <div class="pricing-card featured">
+                <h3>Cursos Universitarios</h3>
+                <div class="price">Personalizado<span class="price-period">según curso</span></div>
+                <p style="color: #666; font-size: 0.9rem;">Apoyo en Cálculo, Física, Álgebra Lineal y más.</p>
+                <ul>
+                    <li>Tutorías con profesores UNI</li>
+                    <li>Clases magistrales en línea</li>
+                    <li>Resolución de ejercicios</li>
+                    <li>Preparación para exámenes</li>
+                </ul>
+                <button class="btn btn-primary">Solicitar Información</button>
+            </div>
+            <div class="pricing-card">
+                <h3>Tutoría Personalizada</h3>
+                <div class="price">Por sesión<span class="price-period">negociable</span></div>
+                <p style="color: #666; font-size: 0.9rem;">Clases uno a uno adaptadas a tus necesidades.</p>
+                <ul>
+                    <li>Horarios flexibles</li>
+                    <li>Profesor especializado</li>
+                    <li>Plan de estudio personalizado</li>
+                    <li>Virtual o presencial</li>
+                </ul>
+                <button class="btn">Agendar Consulta</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="join-section" id="join">
+        <h2>Ponte en contacto ahora</h2>
+        <p>Somos tu aliado en el camino hacia la Universidad Nacional de Ingeniería</p>
+        <div>
+            <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20me%20gustaría%20conocer%20sobre%20sus%20servicios" class="btn" style="color: white; border-color: white;">WhatsApp: 933 884 059</a>
+            <a href="https://instagram.com/acad_area52" class="btn btn-primary" style="background: white; color: #00c896; border-color: white;">Síguenos en Instagram</a>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2024 Área 52 UNI. Centro de Asesoría y Preparación Académica.</p>
+        <p>📍 San Martín de Porres, Lima, Perú</p>
+        <p>📱 WhatsApp: 933 884 059 • 📧 @acad_area52</p>
+        <div style="margin: 1.5rem 0; display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+            <a href="https://www.instagram.com/acad_area52/" target="_blank" style="color: #E4405F; text-decoration: none; font-weight: bold;">📸 Instagram</a>
+            <a href="https://www.facebook.com/p/AREA-52-UNI-100092290451032/" target="_blank" style="color: #1877F2; text-decoration: none; font-weight: bold;">👤 Facebook</a>
+            <a href="https://www.tiktok.com/@area52uni" target="_blank" style="color: #25F4EE; text-decoration: none; font-weight: bold;">🎵 TikTok</a>
+        </div>
+        <p style="font-size: 0.85rem; margin-top: 1rem;">Síguenos en todas nuestras redes para contenido educativo, tips de estudio y promociones especiales</p>
+    </footer>
+</body>
+</html>

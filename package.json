@@ -1,0 +1,29 @@
+{
+  "name": "area52-uni",
+  "version": "1.0.0",
+  "description": "Sitio web oficial de Área 52 UNI - Centro de Asesoría y Preparación Académica",
+  "main": "index.js",
+  "scripts": {
+    "dev": "http-server public -p 3000 -c-1",
+    "build": "echo 'Build complete'",
+    "start": "http-server public -p 5000",
+    "deploy:vercel": "vercel",
+    "deploy:firebase": "firebase deploy",
+    "firebase:login": "firebase login",
+    "firebase:init": "firebase init"
+  },
+  "keywords": [
+    "UNI",
+    "preparación académica",
+    "tutorías",
+    "preuniversitario"
+  ],
+  "author": "Área 52 UNI",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "firebase": "^10.7.0"
+  }
+}
