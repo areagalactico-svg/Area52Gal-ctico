@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Temarios - Área 52 UNI</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .hero-mini { background: linear-gradient(135deg, #0f3460, #1a1a2e); color: white; padding: 3rem 2rem; text-align: center; }
+    .temario-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1rem; transition: all 0.3s; border-left: 4px solid #00c896; }
+    .temario-card:hover { transform: translateY(-3px); box-shadow: 0 5px 20px rgba(0,0,0,0.12); }
+    .temario-card h3 { color: #1a1a2e; margin-bottom: 0.3rem; }
+    .temario-card .curso-badge { display: inline-block; background: #f0faf7; color: #00c896; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+    .temario-card .contenido { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; white-space: pre-line; color: #555; line-height: 1.8; }
+    .temario-card.expanded .contenido { display: block; }
+    .toggle-btn { color: #00c896; font-weight: bold; cursor: pointer; margin-top: 0.5rem; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header style="background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;">
+    <a href="/" style="font-size: 1.3rem; font-weight: bold;">👽 Área 52 UNI</a>
+    <nav>
+      <a href="/" style="color: white; margin-left: 1.5rem;">Inicio</a>
+      <a href="/test-vocacional.html" style="color: white; margin-left: 1.5rem;">Test Vocacional</a>
+      <a href="/simulacro-ien.html" style="color: white; margin-left: 1.5rem;">Simulacro IEN</a>
+      <a href="/videos.html" style="color: white; margin-left: 1.5rem;">Videos</a>
+      <a href="/temarios.html" style="color: #00c896; margin-left: 1.5rem;">Temarios</a>
+      <a href="/examenes.html" style="color: white; margin-left: 1.5rem;">Exámenes</a>
+    </nav>
+  </header>
+
+  <section class="hero-mini">
+    <h1>Temarios</h1>
+    <p>Contenido programático de cada curso</p>
+  </section>
+
+  <div class="container" style="max-width: 800px;">
+    <div id="temarios-list"></div>
+  </div>
+
+  <script type="module">
+    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+
+    async function loadTemarios() {
+      const q = query(collection(db, "temarios"), orderBy("fecha", "desc"));
+      const snap = await getDocs(q);
+      const list = document.getElementById("temarios-list");
+
+      if (snap.empty) {
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay temarios disponibles aún.</p></div>';
+        return;
+      }
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const card = document.createElement("div");
+        card.className = "temario-card";
+        card.innerHTML = `
+          <h3>${data.titulo}</h3>
+          <span class="curso-badge">${data.curso || ""}</span>
+          <span class="toggle-btn" onclick="this.parentElement.classList.toggle('expanded')">Ver contenido ▼</span>
+          <div class="contenido">${data.contenido || ""}</div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    loadTemarios();
+  </script>
+</body>
+</html>

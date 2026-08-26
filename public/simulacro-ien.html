@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulacro IEN - Área 52 UNI</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .hero-mini { background: linear-gradient(135deg, #0f3460, #1a1a2e); color: white; padding: 3rem 2rem; text-align: center; }
+    .timer { position: fixed; top: 70px; right: 20px; background: #1a1a2e; color: #00c896; padding: 0.8rem 1.5rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .timer.warning { color: #e74c3c; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.5; } }
+    .test-card { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1rem; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+    .test-card:hover { border-color: #00c896; transform: translateY(-3px); }
+    .question-card { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+    .option-label { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.3s; }
+    .option-label:hover { border-color: #00c896; background: #f0faf7; }
+    .option-label:has(input:checked) { border-color: #00c896; background: #f0faf7; }
+    .result-card { background: white; border-radius: 12px; padding: 3rem; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+    .progress-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 2rem; }
+    .progress-bar-fill { height: 100%; background: #00c896; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <header style="background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;">
+    <a href="/" style="font-size: 1.3rem; font-weight: bold;">👽 Área 52 UNI</a>
+    <nav>
+      <a href="/" style="color: white; margin-left: 1.5rem;">Inicio</a>
+      <a href="/test-vocacional.html" style="color: white; margin-left: 1.5rem;">Test Vocacional</a>
+      <a href="/simulacro-ien.html" style="color: #00c896; margin-left: 1.5rem;">Simulacro IEN</a>
+      <a href="/videos.html" style="color: white; margin-left: 1.5rem;">Videos</a>
+      <a href="/temarios.html" style="color: white; margin-left: 1.5rem;">Temarios</a>
+      <a href="/examenes.html" style="color: white; margin-left: 1.5rem;">Exámenes</a>
+    </nav>
+  </header>
+
+  <div class="timer" id="timer" style="display: none;">00:00</div>
+
+  <section class="hero-mini">
+    <h1>Simulacro IEN</h1>
+    <p>Practica con exámenes simulacro de ingreso a la UNI</p>
+  </section>
+
+  <div class="container">
+    <div id="simulacros-list" style="max-width: 800px; margin: 2rem auto;"></div>
+    <div id="test-area" style="display: none; max-width: 800px; margin: 2rem auto;"></div>
+  </div>
+
+  <script type="module">
+    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+
+    let timerInterval = null;
+    let timeLeft = 0;
+
+    async function loadSimulacros() {
+      const q = query(collection(db, "simulacros_ien"), orderBy("fecha", "desc"));
+      const snap = await getDocs(q);
+      const list = document.getElementById("simulacros-list");
+
+      if (snap.empty) {
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros disponibles aún.</p></div>';
+        return;
+      }
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const card = document.createElement("div");
+        card.className = "test-card";
+        card.innerHTML = `
+          <h3>${data.titulo}</h3>
+          <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
+          <p style="color: #00c896; font-weight: bold;">${data.preguntas?.length || 0} preguntas | ${data.duracion || 60} minutos</p>
+        `;
+        card.onclick = () => startSimulacro(data);
+        list.appendChild(card);
+      });
+    }
+
+    let currentTest = null;
+    let answers = {};
+
+    window.startSimulacro = function(data) {
+      if (!confirm("El cronómetro comenzará ahora. ¿Estás listo?")) return;
+      currentTest = data;
+      answers = {};
+      timeLeft = (data.duracion || 60) * 60;
+
+      document.getElementById("simulacros-list").style.display = "none";
+      document.getElementById("test-area").style.display = "block";
+      document.getElementById("timer").style.display = "block";
+
+      startTimer();
+      renderQuestions();
+    };
+
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        const min = Math.floor(timeLeft / 60).toString().padStart(2, "0");
+        const sec = (timeLeft % 60).toString().padStart(2, "0");
+        const timerEl = document.getElementById("timer");
+        timerEl.textContent = `${min}:${sec}`;
+        if (timeLeft <= 300) timerEl.classList.add("warning");
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          alert("¡Tiempo agotado!");
+          submitTest();
+        }
+      }, 1000);
+    }
+
+    function renderQuestions() {
+      const area = document.getElementById("test-area");
+      let html = `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
+      currentTest.preguntas.forEach((q, qi) => {
+        html += `
+          <div class="question-card">
+            <h3>${qi + 1}. ${q.texto}</h3>
+            ${q.opciones.map((o, oi) => `
+              <label class="option-label">
+                <input type="radio" name="q-${qi}" value="${oi}" onchange="answers[${qi}] = ${oi}; updateProgress()">
+                <span>${o}</span>
+              </label>
+            `).join("")}
+          </div>
+        `;
+      });
+      html += `<button class="btn btn-primary" onclick="submitTest()" style="width: 100%; padding: 1rem;">Entregar Simulacro</button>`;
+      area.innerHTML = html;
+      window.answers = answers;
+    }
+
+    window.updateProgress = function() {
+      const total = currentTest.preguntas.length;
+      const answered = Object.keys(window.answers).length;
+      document.querySelector(".progress-bar-fill").style.width = ((answered / total) * 100) + "%";
+    };
+
+    window.submitTest = function() {
+      clearInterval(timerInterval);
+      document.getElementById("timer").style.display = "none";
+
+      const total = currentTest.preguntas.length;
+      let correct = 0;
+      currentTest.preguntas.forEach((q, qi) => {
+        if (window.answers[qi] === q.respuestaCorrecta) correct++;
+      });
+
+      const pct = Math.round((correct / total) * 100);
+      const area = document.getElementById("test-area");
+      const elapsed = (currentTest.duracion || 60) * 60 - timeLeft;
+      const elapsedMin = Math.floor(elapsed / 60);
+
+      let msg = "";
+      if (pct >= 80) msg = "Excelente! Estás bien preparado para el examen de ingreso.";
+      else if (pct >= 60) msg = "Buen resultado. Sigue practicando para mejorar.";
+      else if (pct >= 40) msg = "Resultado regular. Te recomendamos reforzar estas áreas.";
+      else msg = "Necesitas estudiar más. No te rindas, ¡tú puedes!";
+
+      area.innerHTML = `
+        <div class="result-card">
+          <h2 style="color: #00c896; font-size: 3rem;">${correct}/${total}</h2>
+          <p style="font-size: 1.5rem; color: #333;">${pct}% de aciertos</p>
+          <p style="color: #888; margin: 0.5rem 0;">Tiempo usado: ${elapsedMin} minutos</p>
+          <p style="font-size: 1.1rem; color: #666; margin: 1.5rem 0;">${msg}</p>
+          <button class="btn" onclick="location.reload()">Volver a elegir simulacro</button>
+        </div>
+      `;
+    };
+
+    loadSimulacros();
+  </script>
+</body>
+</html>

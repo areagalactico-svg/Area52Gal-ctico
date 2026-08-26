@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exámenes Pasados - Área 52 UNI</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .hero-mini { background: linear-gradient(135deg, #0f3460, #1a1a2e); color: white; padding: 3rem 2rem; text-align: center; }
+    .filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; justify-content: center; }
+    .filter-btn { padding: 0.5rem 1.2rem; border: 2px solid #00c896; background: transparent; color: #00c896; border-radius: 50px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+    .filter-btn.active, .filter-btn:hover { background: #00c896; color: white; }
+    .examen-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
+    .examen-card:hover { transform: translateY(-3px); box-shadow: 0 5px 20px rgba(0,0,0,0.12); }
+    .examen-info h3 { color: #1a1a2e; margin-bottom: 0.3rem; }
+    .examen-info p { color: #888; font-size: 0.9rem; }
+    .examen-info .badge { display: inline-block; background: #f0faf7; color: #00c896; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-right: 0.5rem; margin-top: 0.3rem; }
+  </style>
+</head>
+<body>
+  <header style="background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;">
+    <a href="/" style="font-size: 1.3rem; font-weight: bold;">👽 Área 52 UNI</a>
+    <nav>
+      <a href="/" style="color: white; margin-left: 1.5rem;">Inicio</a>
+      <a href="/test-vocacional.html" style="color: white; margin-left: 1.5rem;">Test Vocacional</a>
+      <a href="/simulacro-ien.html" style="color: white; margin-left: 1.5rem;">Simulacro IEN</a>
+      <a href="/videos.html" style="color: white; margin-left: 1.5rem;">Videos</a>
+      <a href="/temarios.html" style="color: white; margin-left: 1.5rem;">Temarios</a>
+      <a href="/examenes.html" style="color: #00c896; margin-left: 1.5rem;">Exámenes</a>
+    </nav>
+  </header>
+
+  <section class="hero-mini">
+    <h1>Exámenes Pasados</h1>
+    <p>Descarga exámenes anteriores para practicar</p>
+  </section>
+
+  <div class="container" style="max-width: 800px;">
+    <div class="filter-bar" id="filter-bar"></div>
+    <div id="examenes-list"></div>
+  </div>
+
+  <script type="module">
+    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+
+    let allExamenes = [];
+
+    async function loadExamenes() {
+      const q = query(collection(db, "examenes"), orderBy("fecha", "desc"));
+      const snap = await getDocs(q);
+      allExamenes = [];
+      const mats = new Set(["Todos"]);
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        allExamenes.push(data);
+        if (data.materia) mats.add(data.materia);
+      });
+
+      const filterBar = document.getElementById("filter-bar");
+      mats.forEach(m => {
+        const btn = document.createElement("button");
+        btn.className = "filter-btn" + (m === "Todos" ? " active" : "");
+        btn.textContent = m;
+        btn.onclick = (e) => {
+          document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+          e.target.classList.add("active");
+          renderExamenes(m === "Todos" ? allExamenes : allExamenes.filter(ex => ex.materia === m));
+        };
+        filterBar.appendChild(btn);
+      });
+
+      renderExamenes(allExamenes);
+    }
+
+    function renderExamenes(examenes) {
+      const list = document.getElementById("examenes-list");
+      list.innerHTML = "";
+
+      if (examenes.length === 0) {
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay exámenes disponibles aún.</p></div>';
+        return;
+      }
+
+      examenes.forEach(ex => {
+        const card = document.createElement("div");
+        card.className = "examen-card";
+        card.innerHTML = `
+          <div class="examen-info">
+            <h3>${ex.titulo}</h3>
+            <p>${ex.descripcion || ""}</p>
+            <span class="badge">${ex.materia || ""}</span>
+            <span class="badge">${ex.year || ""}</span>
+          </div>
+          ${ex.fileUrl ? `<a href="${ex.fileUrl}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>` : ""}
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    loadExamenes();
+  </script>
+</body>
+</html>
