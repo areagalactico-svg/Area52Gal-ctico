@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Área 52 UNI</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Login Page -->
+  <div id="login-page" class="login-page">
+    <div class="login-card">
+      <h1>👽 Área 52 UNI</h1>
+      <p>Panel de Administración</p>
+      <button id="google-login-btn" class="google-btn">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+        Iniciar sesión con Google
+      </button>
+      <p id="login-error" style="color: red; margin-top: 1rem; display: none;"></p>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin-panel" style="display: none;">
+    <header class="header-admin">
+      <h1>👽 Área 52 - Panel Admin</h1>
+      <div class="user-info">
+        <img id="user-photo" src="" alt="avatar">
+        <span id="user-name"></span>
+        <button class="btn btn-sm btn-danger" id="logout-btn">Salir</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tests">Test Vocacionales</button>
+        <button class="tab-btn" data-tab="simulacros">Simulacros IEN</button>
+        <button class="tab-btn" data-tab="videos">Videos</button>
+        <button class="tab-btn" data-tab="temarios">Temarios</button>
+        <button class="tab-btn" data-tab="examenes">Exámenes</button>
+      </div>
+
+      <!-- Test Vocacionales -->
+      <div class="tab-content active" id="tab-tests">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Test Vocacionales</h2>
+          <button class="btn btn-primary" onclick="openModal('test')">+ Nuevo Test</button>
+        </div>
+        <div id="tests-list"></div>
+      </div>
+
+      <!-- Simulacros IEN -->
+      <div class="tab-content" id="tab-simulacros">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Simulacros IEN</h2>
+          <button class="btn btn-primary" onclick="openModal('simulacro')">+ Nuevo Simulacro</button>
+        </div>
+        <div id="simulacros-list"></div>
+      </div>
+
+      <!-- Videos -->
+      <div class="tab-content" id="tab-videos">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Videos de Comentarios</h2>
+          <button class="btn btn-primary" onclick="openModal('video')">+ Nuevo Video</button>
+        </div>
+        <div id="videos-list"></div>
+      </div>
+
+      <!-- Temarios -->
+      <div class="tab-content" id="tab-temarios">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Temarios</h2>
+          <button class="btn btn-primary" onclick="openModal('temario')">+ Nuevo Temario</button>
+        </div>
+        <div id="temarios-list"></div>
+      </div>
+
+      <!-- Exámenes -->
+      <div class="tab-content" id="tab-examenes">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Exámenes Pasados</h2>
+          <button class="btn btn-primary" onclick="openModal('examen')">+ Nuevo Examen</button>
+        </div>
+        <div id="examenes-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2 id="modal-title"></h2>
+      <div id="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" id="modal-save-btn">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>
