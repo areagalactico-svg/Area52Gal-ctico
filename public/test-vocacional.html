@@ -43,6 +43,32 @@
 
   <div class="container" id="main-container">
     <div id="tests-list" style="max-width: 800px; margin: 2rem auto;"></div>
+
+    <div id="ai-generate-section" style="max-width: 800px; margin: 2rem auto; display: none;">
+      <div class="card" style="border-left: 4px solid #00c896;">
+        <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Test Vocacional con IA</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">No hay tests guardados. Genera un test personalizado por área:</p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <select id="ai-voc-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Preferencias académicas e intereses">Preferencias académicas e intereses</option>
+            <option value="Habilidades lógicas y matemáticas">Habilidades lógicas y matemáticas</option>
+            <option value="Perfil personal para ingeniería">Perfil personal para ingeniería</option>
+            <option value="Intereses profesionales en ingeniería">Intereses profesionales en ingeniería</option>
+            <option value="Valores y metas profesionales">Valores y metas profesionales</option>
+          </select>
+          <select id="ai-voc-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+            <option value="5">5 preguntas</option>
+            <option value="10" selected>10 preguntas</option>
+            <option value="15">15 preguntas</option>
+          </select>
+          <button class="btn btn-primary" id="btn-generate-voc" onclick="generateAITest()" style="white-space: nowrap;">
+            Generar
+          </button>
+        </div>
+        <div id="ai-voc-status" style="display: none; color: #00c896; font-size: 0.9rem;"></div>
+      </div>
+    </div>
+
     <div id="test-area" style="display: none; max-width: 800px; margin: 2rem auto;"></div>
   </div>
 
@@ -55,7 +81,8 @@
       const list = document.getElementById("tests-list");
 
       if (snap.empty) {
-        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay tests disponibles aún. Vuelve pronto.</p></div>';
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay tests guardados.</p></div>';
+        document.getElementById('ai-generate-section').style.display = 'block';
         return;
       }
 
@@ -140,7 +167,49 @@
       `;
     };
 
+    window.generateAITest = async function() {
+      const topic = document.getElementById('ai-voc-topic').value;
+      const count = parseInt(document.getElementById('ai-voc-count').value);
+      const btn = document.getElementById('btn-generate-voc');
+      const status = document.getElementById('ai-voc-status');
+
+      btn.disabled = true;
+      btn.textContent = 'Generando...';
+      status.style.display = 'block';
+      status.style.color = '#00c896';
+      status.textContent = 'La IA está creando tu test vocacional...';
+
+      try {
+        const res = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, type: 'vocacional', count })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.preguntas && data.preguntas.length > 0) {
+          const testData = {
+            titulo: `Test IA: ${topic}`,
+            descripcion: 'Generado por inteligencia artificial',
+            preguntas: data.preguntas
+          };
+          startTest('ai-generated', testData);
+        } else {
+          status.style.color = '#e74c3c';
+          status.textContent = 'No se pudieron generar las preguntas. Intenta con otro tema.';
+        }
+      } catch (err) {
+        status.style.color = '#e74c3c';
+        status.textContent = 'Error de conexión. Verifica tu internet.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generar';
+      }
+    };
+
     loadTests();
   </script>
+  <script src="/js/chat.js"></script>
 </body>
 </html>

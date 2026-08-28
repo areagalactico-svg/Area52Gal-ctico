@@ -43,6 +43,36 @@
 
   <div class="container">
     <div id="simulacros-list" style="max-width: 800px; margin: 2rem auto;"></div>
+
+    <div id="ai-generate-section" style="max-width: 800px; margin: 2rem auto; display: none;">
+      <div class="card" style="border-left: 4px solid #00c896;">
+        <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Simulacro con IA</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">No hay simulacros guardados. Genera preguntas personalizadas por tema:</p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Cálculo I - Derivadas e Integrales">Cálculo I - Derivadas e Integrales</option>
+            <option value="Cálculo II - Integrales y Series">Cálculo II - Integrales y Series</option>
+            <option value="Cálculo III - Ecuaciones Diferenciales">Cálculo III - Ecuaciones Diferenciales</option>
+            <option value="Álgebra Lineal - Matrices y Vectores">Álgebra Lineal - Matrices y Vectores</option>
+            <option value="Física I - Mecánica y Movimiento">Física I - Mecánica y Movimiento</option>
+            <option value="Física II - Electricidad y Magnetismo">Física II - Electricidad y Magnetismo</option>
+            <option value="Química General">Química General</option>
+            <option value="Matemática Básica - Álgebra y Geometría">Matemática Básica - Álgebra y Geometría</option>
+          </select>
+          <select id="ai-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+            <option value="5">5 preguntas</option>
+            <option value="10" selected>10 preguntas</option>
+            <option value="15">15 preguntas</option>
+            <option value="20">20 preguntas</option>
+          </select>
+          <button class="btn btn-primary" id="btn-generate" onclick="generateAISimulacro()" style="white-space: nowrap;">
+            Generar
+          </button>
+        </div>
+        <div id="ai-status" style="display: none; color: #00c896; font-size: 0.9rem;"></div>
+      </div>
+    </div>
+
     <div id="test-area" style="display: none; max-width: 800px; margin: 2rem auto;"></div>
   </div>
 
@@ -58,7 +88,8 @@
       const list = document.getElementById("simulacros-list");
 
       if (snap.empty) {
-        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros disponibles aún.</p></div>';
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
+        document.getElementById('ai-generate-section').style.display = 'block';
         return;
       }
 
@@ -168,7 +199,50 @@
       `;
     };
 
+    window.generateAISimulacro = async function() {
+      const topic = document.getElementById('ai-topic').value;
+      const count = parseInt(document.getElementById('ai-count').value);
+      const btn = document.getElementById('btn-generate');
+      const status = document.getElementById('ai-status');
+
+      btn.disabled = true;
+      btn.textContent = 'Generando...';
+      status.style.display = 'block';
+      status.style.color = '#00c896';
+      status.textContent = 'La IA está creando tus preguntas, esto puede tardar unos segundos...';
+
+      try {
+        const res = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, type: 'simulacro', count })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.preguntas && data.preguntas.length > 0) {
+          const simulacroData = {
+            titulo: `Simulacro IA: ${topic}`,
+            descripcion: `Preguntas generadas por inteligencia artificial`,
+            duracion: Math.max(15, count * 2),
+            preguntas: data.preguntas
+          };
+          startSimulacro(simulacroData);
+        } else {
+          status.style.color = '#e74c3c';
+          status.textContent = 'No se pudieron generar las preguntas. Intenta con otro tema.';
+        }
+      } catch (err) {
+        status.style.color = '#e74c3c';
+        status.textContent = 'Error de conexión. Verifica tu internet.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generar';
+      }
+    };
+
     loadSimulacros();
   </script>
+  <script src="/js/chat.js"></script>
 </body>
 </html>
