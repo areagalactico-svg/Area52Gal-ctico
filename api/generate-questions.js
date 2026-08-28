@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { topic, type, count } = req.body;
+  const { topic, type, count, context } = req.body;
 
   if (!topic || !type) {
     return res.status(400).json({ error: 'Topic and type are required' });
@@ -25,10 +25,15 @@ module.exports = async function handler(req, res) {
 
   const numQuestions = Math.min(Math.max(count || 5, 1), 20);
 
+  const contextSection = context
+    ? `\n\nCONTEXTO DE MATERIALES DE REFERENCIA (usa estos temas como guía para crear preguntas similares):\n${context}`
+    : '';
+
   let systemPrompt = '';
 
   if (type === 'simulacro') {
     systemPrompt = `Eres un generador de preguntas de examen para el examen de ingreso a la UNI (Universidad Nacional de Ingeniería) de Perú.
+${contextSection}
 
 Genera exactamente ${numQuestions} preguntas de opción múltiple sobre: ${topic}
 
@@ -50,9 +55,11 @@ Reglas:
 - respuestaCorrecta es el índice (0-3) de la opción correcta
 - Incluye una explicación breve para cada respuesta
 - Varía la dificultad: algunas fáciles, algunas difíciles
-- No repitas conceptos entre preguntas`;
+- No repitas conceptos entre preguntas
+- Si hay contexto de referencia, genera preguntas de estilo y dificultad similares`;
   } else {
     systemPrompt = `Eres un generador de preguntas de test vocacional para estudiantes que quieren ingresar a la UNI.
+${contextSection}
 
 Genera exactamente ${numQuestions} preguntas de opción múltiple sobre: ${topic}
 

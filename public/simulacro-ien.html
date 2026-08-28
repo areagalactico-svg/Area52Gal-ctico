@@ -50,14 +50,14 @@
         <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">No hay simulacros guardados. Genera preguntas personalizadas por tema:</p>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
           <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="Cálculo I - Derivadas e Integrales">Cálculo I - Derivadas e Integrales</option>
-            <option value="Cálculo II - Integrales y Series">Cálculo II - Integrales y Series</option>
-            <option value="Cálculo III - Ecuaciones Diferenciales">Cálculo III - Ecuaciones Diferenciales</option>
-            <option value="Álgebra Lineal - Matrices y Vectores">Álgebra Lineal - Matrices y Vectores</option>
-            <option value="Física I - Mecánica y Movimiento">Física I - Mecánica y Movimiento</option>
-            <option value="Física II - Electricidad y Magnetismo">Física II - Electricidad y Magnetismo</option>
-            <option value="Química General">Química General</option>
-            <option value="Matemática Básica - Álgebra y Geometría">Matemática Básica - Álgebra y Geometría</option>
+            <option value="Cálculo I">Cálculo I</option>
+            <option value="Cálculo II">Cálculo II</option>
+            <option value="Cálculo III">Cálculo III</option>
+            <option value="Álgebra Lineal">Álgebra Lineal</option>
+            <option value="Física I">Física I</option>
+            <option value="Física II">Física II</option>
+            <option value="Química">Química</option>
+            <option value="Matemática Básica">Matemática Básica</option>
           </select>
           <select id="ai-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
             <option value="5">5 preguntas</option>
@@ -77,10 +77,26 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+    import { db, collection, getDocs, query, orderBy, where } from "/js/firebase-config.js";
 
     let timerInterval = null;
     let timeLeft = 0;
+
+    async function fetchMaterialsContext(materia) {
+      try {
+        const q = query(collection(db, "materiales_referencia"), where("materia", "==", materia));
+        const snap = await getDocs(q);
+        if (snap.empty) return "";
+        let context = "";
+        snap.forEach(doc => {
+          const data = doc.data();
+          context += `- ${data.titulo}: ${data.descripcion || "Sin descripción"}\n`;
+        });
+        return context;
+      } catch (e) {
+        return "";
+      }
+    }
 
     async function loadSimulacros() {
       const q = query(collection(db, "simulacros_ien"), orderBy("fecha", "desc"));
@@ -269,13 +285,17 @@
       btn.textContent = 'Generando...';
       status.style.display = 'block';
       status.style.color = '#00c896';
+      status.textContent = 'Buscando materiales de referencia...';
+
+      const context = await fetchMaterialsContext(topic);
+
       status.textContent = 'La IA está creando tus preguntas, esto puede tardar unos segundos...';
 
       try {
         const res = await fetch('/api/generate-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, type: 'simulacro', count })
+          body: JSON.stringify({ topic, type: 'simulacro', count, context })
         });
 
         const data = await res.json();

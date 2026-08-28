@@ -41,6 +41,7 @@
         <button class="tab-btn" data-tab="videos">Videos</button>
         <button class="tab-btn" data-tab="temarios">Temarios</button>
         <button class="tab-btn" data-tab="examenes">Exámenes</button>
+        <button class="tab-btn" data-tab="materiales">📚 Materiales IA</button>
       </div>
 
       <!-- Test Vocacionales -->
@@ -86,6 +87,18 @@
           <button class="btn btn-primary" onclick="openModal('examen')">+ Nuevo Examen</button>
         </div>
         <div id="examenes-list"></div>
+      </div>
+
+      <!-- Materiales de Referencia para IA -->
+      <div class="tab-content" id="tab-materiales">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>Materiales de Referencia para IA</h2>
+          <button class="btn btn-primary" onclick="openModal('material')">+ Subir Material</button>
+        </div>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+          Sube exámenes pasados, guías de estudio o preguntas tipo. La IA usará estos materiales como base para generar nuevos tests y simulacros.
+        </p>
+        <div id="materiales-list"></div>
       </div>
     </div>
   </div>

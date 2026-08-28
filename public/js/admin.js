@@ -64,7 +64,8 @@ async function loadAllData() {
     loadCollection("simulacros_ien", "simulacros-list", "simulacro"),
     loadCollection("videos", "videos-list", "video"),
     loadCollection("temarios", "temarios-list", "temario"),
-    loadCollection("examenes", "examenes-list", "examen")
+    loadCollection("examenes", "examenes-list", "examen"),
+    loadCollection("materiales_referencia", "materiales-list", "material")
   ]);
   updateStats();
 }
@@ -99,8 +100,8 @@ async function loadCollection(colName, listId, type) {
 }
 
 async function updateStats() {
-  const collections = ["test_vocacionales", "simulacros_ien", "videos", "temarios", "examenes"];
-  const labels = ["Tests", "Simulacros", "Videos", "Temarios", "Exámenes"];
+  const collections = ["test_vocacionales", "simulacros_ien", "videos", "temarios", "examenes", "materiales_referencia"];
+  const labels = ["Tests", "Simulacros", "Videos", "Temarios", "Exámenes", "Materiales"];
   const grid = document.getElementById("stats-grid");
   grid.innerHTML = "";
 
@@ -218,6 +219,7 @@ window.openModal = function(type, editData = null, editId = null) {
       break;
 
     case "examen":
+      existingFiles = editData?.archivos ? [...editData.archivos] : (editData?.fileUrl ? [{ name: editData.fileName || "Documento", url: editData.fileUrl }] : []);
       title.textContent = editData ? "Editar Examen" : "Nuevo Examen";
       body.innerHTML = `
         <div class="form-group">
@@ -245,11 +247,49 @@ window.openModal = function(type, editData = null, editId = null) {
           <textarea id="field-descripcion" placeholder="Descripción del examen...">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
-          <label>Archivo PDF ${editData?.fileUrl ? "(Ya subido - subir otro lo reemplazará)" : ""}</label>
-          <input type="file" id="field-file" accept=".pdf">
+          <label>Archivos del examen (PDF o imágenes)</label>
+          <input type="file" id="field-archivos-examen" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
+          <small style="color: #888;">Puedes seleccionar varios archivos (PDF, JPG, PNG)</small>
+          <div id="existing-examen-files" style="margin-top: 0.5rem;"></div>
         </div>
-        ${editData?.fileUrl ? `<p><a href="${editData.fileUrl}" target="_blank" style="color: #00c896;">📄 Ver PDF actual</a></p>` : ""}
       `;
+      renderExistingExamenFiles();
+      break;
+
+    case "material":
+      existingFiles = editData?.archivos ? [...editData.archivos] : [];
+      title.textContent = editData ? "Editar Material" : "Subir Material de Referencia";
+      body.innerHTML = `
+        <div class="form-group">
+          <label>Nombre del material</label>
+          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN 2023 - Cálculo">
+        </div>
+        <div class="form-group">
+          <label>Materia / Tema</label>
+          <select id="field-materia">
+            <option value="Cálculo I" ${editData?.materia === "Cálculo I" ? "selected" : ""}>Cálculo I</option>
+            <option value="Cálculo II" ${editData?.materia === "Cálculo II" ? "selected" : ""}>Cálculo II</option>
+            <option value="Cálculo III" ${editData?.materia === "Cálculo III" ? "selected" : ""}>Cálculo III</option>
+            <option value="Física I" ${editData?.materia === "Física I" ? "selected" : ""}>Física I</option>
+            <option value="Física II" ${editData?.materia === "Física II" ? "selected" : ""}>Física II</option>
+            <option value="Álgebra Lineal" ${editData?.materia === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
+            <option value="Química" ${editData?.materia === "Química" ? "selected" : ""}>Química</option>
+            <option value="Matemática Básica" ${editData?.materia === "Matemática Básica" ? "selected" : ""}>Matemática Básica</option>
+            <option value="General" ${editData?.materia === "General" ? "selected" : ""}>General</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descripción (opcional)</label>
+          <textarea id="field-descripcion" placeholder="Describe el contenido del material...">${editData?.descripcion || ""}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Archivos (PDF o imágenes)</label>
+          <input type="file" id="field-archivos-material" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
+          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo. La IA los usará como referencia.</small>
+          <div id="existing-material-files" style="margin-top: 0.5rem;"></div>
+        </div>
+      `;
+      renderExistingMaterialFiles();
       break;
   }
 
@@ -340,6 +380,56 @@ window.removeExistingFile = function(index) {
   renderExistingFiles();
 };
 
+function renderExistingExamenFiles() {
+  const container = document.getElementById("existing-examen-files");
+  if (!container) return;
+  container.innerHTML = "";
+
+  existingFiles.forEach((file, fi) => {
+    const div = document.createElement("div");
+    div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
+    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+    div.innerHTML = `
+      <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
+      </span>
+      <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
+      <button class="btn btn-sm btn-danger" onclick="removeExistingExamenFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+window.removeExistingExamenFile = function(index) {
+  existingFiles.splice(index, 1);
+  renderExistingExamenFiles();
+};
+
+function renderExistingMaterialFiles() {
+  const container = document.getElementById("existing-material-files");
+  if (!container) return;
+  container.innerHTML = "";
+
+  existingFiles.forEach((file, fi) => {
+    const div = document.createElement("div");
+    div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
+    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+    div.innerHTML = `
+      <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
+      </span>
+      <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
+      <button class="btn btn-sm btn-danger" onclick="removeExistingMaterialFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+window.removeExistingMaterialFile = function(index) {
+  existingFiles.splice(index, 1);
+  renderExistingMaterialFiles();
+};
+
 async function saveItem() {
   const data = {};
 
@@ -383,14 +473,34 @@ async function saveItem() {
       data.year = parseInt(document.getElementById("field-year").value);
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      const fileInput = document.getElementById("field-file");
-      if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const storageRef = ref(storage, `examenes/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        data.fileUrl = await getDownloadURL(storageRef);
-        data.fileName = file.name;
+      const fileInputExamen = document.getElementById("field-archivos-examen");
+      const uploadedExamenFiles = [];
+      if (fileInputExamen.files.length > 0) {
+        for (const file of fileInputExamen.files) {
+          const storageRef = ref(storage, `examenes/${Date.now()}_${file.name}`);
+          await uploadBytes(storageRef, file);
+          const url = await getDownloadURL(storageRef);
+          uploadedExamenFiles.push({ name: file.name, url });
+        }
       }
+      data.archivos = [...existingFiles, ...uploadedExamenFiles];
+      break;
+
+    case "material":
+      data.titulo = document.getElementById("field-titulo").value;
+      data.materia = document.getElementById("field-materia").value;
+      data.descripcion = document.getElementById("field-descripcion").value;
+      const fileInputMaterial = document.getElementById("field-archivos-material");
+      const uploadedMaterialFiles = [];
+      if (fileInputMaterial.files.length > 0) {
+        for (const file of fileInputMaterial.files) {
+          const storageRef = ref(storage, `materiales/${Date.now()}_${file.name}`);
+          await uploadBytes(storageRef, file);
+          const url = await getDownloadURL(storageRef);
+          uploadedMaterialFiles.push({ name: file.name, url });
+        }
+      }
+      data.archivos = [...existingFiles, ...uploadedMaterialFiles];
       break;
   }
 

@@ -83,16 +83,41 @@
       }
 
       examenes.forEach(ex => {
+        const archivos = ex.archivos || (ex.fileUrl ? [{ name: ex.fileName || "Documento", url: ex.fileUrl }] : []);
         const card = document.createElement("div");
         card.className = "examen-card";
+        card.style.flexDirection = "column";
+        card.style.alignItems = "flex-start";
+        card.style.gap = "1rem";
+
+        let filesHtml = "";
+        if (archivos.length > 0) {
+          filesHtml = `<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">`;
+          archivos.forEach(file => {
+            const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+            if (isImage) {
+              filesHtml += `
+                <a href="${file.url}" download="${file.name}" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0;">
+                  🖼️ ${file.name} ⬇
+                </a>`;
+            } else {
+              filesHtml += `
+                <a href="${file.url}" download="${file.name}" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0;">
+                  📄 ${file.name} ⬇
+                </a>`;
+            }
+          });
+          filesHtml += `</div>`;
+        }
+
         card.innerHTML = `
-          <div class="examen-info">
+          <div class="examen-info" style="width: 100%;">
             <h3>${ex.titulo}</h3>
             <p>${ex.descripcion || ""}</p>
             <span class="badge">${ex.materia || ""}</span>
             <span class="badge">${ex.year || ""}</span>
+            ${filesHtml}
           </div>
-          ${ex.fileUrl ? `<a href="${ex.fileUrl}" target="_blank" class="btn btn-primary">📄 Ver PDF</a>` : ""}
         `;
         list.appendChild(card);
       });

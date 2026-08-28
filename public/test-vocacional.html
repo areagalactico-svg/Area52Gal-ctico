@@ -73,7 +73,23 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+    import { db, collection, getDocs, query, orderBy, where } from "/js/firebase-config.js";
+
+    async function fetchMaterialsContext(materia) {
+      try {
+        const q = query(collection(db, "materiales_referencia"), where("materia", "==", materia));
+        const snap = await getDocs(q);
+        if (snap.empty) return "";
+        let context = "";
+        snap.forEach(doc => {
+          const data = doc.data();
+          context += `- ${data.titulo}: ${data.descripcion || "Sin descripción"}\n`;
+        });
+        return context;
+      } catch (e) {
+        return "";
+      }
+    }
 
     async function loadTests() {
       const q = query(collection(db, "test_vocacionales"), orderBy("fecha", "desc"));
@@ -180,13 +196,17 @@
       btn.textContent = 'Generando...';
       status.style.display = 'block';
       status.style.color = '#00c896';
+      status.textContent = 'Buscando materiales de referencia...';
+
+      const context = await fetchMaterialsContext(topic);
+
       status.textContent = 'La IA está creando tu test vocacional...';
 
       try {
         const res = await fetch('/api/generate-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, type: 'vocacional', count })
+          body: JSON.stringify({ topic, type: 'vocacional', count, context })
         });
 
         const data = await res.json();
