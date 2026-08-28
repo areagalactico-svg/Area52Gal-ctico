@@ -3,6 +3,7 @@ import { auth, db, storage, ADMIN_EMAIL, collection, addDoc, getDocs, doc, updat
 let currentEditId = null;
 let currentType = null;
 let questions = [];
+let existingFiles = [];
 
 document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
@@ -118,6 +119,7 @@ window.openModal = function(type, editData = null, editId = null) {
   currentType = type;
   currentEditId = editId;
   questions = editData?.preguntas ? [...editData.preguntas] : [];
+  existingFiles = editData?.archivos ? [...editData.archivos] : [];
   const overlay = document.getElementById("modal-overlay");
   const title = document.getElementById("modal-title");
   const body = document.getElementById("modal-body");
@@ -144,12 +146,20 @@ window.openModal = function(type, editData = null, editId = null) {
           <input type="number" id="field-duracion" value="${editData?.duracion || 60}" min="1">
         </div>` : ""}
         <div class="form-group">
-          <label>Preguntas (${questions.length} actuales)</label>
+          <label>Archivos del examen (PDF o imágenes)</label>
+          <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
+          <small style="color: #888;">Puedes seleccionar varios archivos a la vez (PDF, JPG, PNG)</small>
+          <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
+        </div>
+        <div class="form-group">
+          <label>Preguntas interactivas (${questions.length} actuales)</label>
+          <p style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">Opcional: agrega preguntas de opción múltiple para evaluación</p>
           <div id="questions-container"></div>
           <button class="btn btn-sm" onclick="addQuestion()" style="margin-top: 0.5rem;">+ Agregar Pregunta</button>
         </div>
       `;
       renderQuestions();
+      renderExistingFiles();
       break;
 
     case "video":
@@ -251,6 +261,7 @@ window.closeModal = function() {
   currentEditId = null;
   currentType = null;
   questions = [];
+  existingFiles = [];
 };
 
 window.addQuestion = function() {
@@ -304,6 +315,31 @@ function renderQuestions() {
   });
 }
 
+function renderExistingFiles() {
+  const container = document.getElementById("existing-files-container");
+  if (!container) return;
+  container.innerHTML = "";
+
+  existingFiles.forEach((file, fi) => {
+    const div = document.createElement("div");
+    div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
+    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+    div.innerHTML = `
+      <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
+      </span>
+      <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
+      <button class="btn btn-sm btn-danger" onclick="removeExistingFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+window.removeExistingFile = function(index) {
+  existingFiles.splice(index, 1);
+  renderExistingFiles();
+};
+
 async function saveItem() {
   const data = {};
 
@@ -315,6 +351,17 @@ async function saveItem() {
       data.preguntas = questions;
       if (currentType === "simulacro") {
         data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
+        const fileInput = document.getElementById("field-archivos");
+        const uploadedFiles = [];
+        if (fileInput.files.length > 0) {
+          for (const file of fileInput.files) {
+            const storageRef = ref(storage, `simulacros/${Date.now()}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
+            uploadedFiles.push({ name: file.name, url });
+          }
+        }
+        data.archivos = [...existingFiles, ...uploadedFiles];
       }
       break;
 

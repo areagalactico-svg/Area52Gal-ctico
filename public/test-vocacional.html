@@ -82,23 +82,26 @@
 
       if (snap.empty) {
         list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay tests guardados.</p></div>';
-        document.getElementById('ai-generate-section').style.display = 'block';
-        return;
+      } else {
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          const numPreguntas = data.preguntas?.length || 0;
+          if (numPreguntas === 0) return;
+          const card = document.createElement("div");
+          card.className = "test-card";
+          card.innerHTML = `
+            <h3>${data.titulo}</h3>
+            <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
+            <p style="color: #00c896; font-weight: bold;">${numPreguntas} preguntas</p>
+          `;
+          card.onclick = () => startTest(docSnap.id, data);
+          list.appendChild(card);
+        });
+        if (list.children.length === 0) {
+          list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay tests con preguntas disponibles.</p></div>';
+        }
       }
-
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        const numPreguntas = data.preguntas?.length || 0;
-        const card = document.createElement("div");
-        card.className = "test-card";
-        card.innerHTML = `
-          <h3>${data.titulo}</h3>
-          <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
-          <p style="color: #00c896; font-weight: bold;">${numPreguntas} preguntas</p>
-        `;
-        card.onclick = () => startTest(docSnap.id, data);
-        list.appendChild(card);
-      });
+      document.getElementById('ai-generate-section').style.display = 'block';
     }
 
     let currentTest = null;

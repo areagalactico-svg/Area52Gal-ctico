@@ -89,37 +89,80 @@
 
       if (snap.empty) {
         list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
-        document.getElementById('ai-generate-section').style.display = 'block';
-        return;
+      } else {
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          const numPreguntas = data.preguntas?.length || 0;
+          const numArchivos = data.archivos?.length || 0;
+          if (numPreguntas === 0 && numArchivos === 0) return;
+          const card = document.createElement("div");
+          card.className = "test-card";
+          const archivosInfo = numArchivos > 0 ? `<span style="color: #888;"> | ${numArchivos} archivo${numArchivos > 1 ? 's' : ''}</span>` : '';
+          const preguntasInfo = numPreguntas > 0 ? `${numPreguntas} preguntas` : 'Solo archivos';
+          card.innerHTML = `
+            <h3>${data.titulo}</h3>
+            <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
+            <p style="color: #00c896; font-weight: bold;">${preguntasInfo} ${archivosInfo} | ${data.duracion || 60} minutos</p>
+          `;
+          card.onclick = () => startSimulacro(data);
+          list.appendChild(card);
+        });
+        if (list.children.length === 0) {
+          list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros con preguntas.</p></div>';
+        }
       }
-
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        const card = document.createElement("div");
-        card.className = "test-card";
-        card.innerHTML = `
-          <h3>${data.titulo}</h3>
-          <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
-          <p style="color: #00c896; font-weight: bold;">${data.preguntas?.length || 0} preguntas | ${data.duracion || 60} minutos</p>
-        `;
-        card.onclick = () => startSimulacro(data);
-        list.appendChild(card);
-      });
+      document.getElementById('ai-generate-section').style.display = 'block';
     }
 
     let currentTest = null;
     let answers = {};
 
     window.startSimulacro = function(data) {
-      if (!confirm("El cronómetro comenzará ahora. ¿Estás listo?")) return;
       currentTest = data;
       answers = {};
       timeLeft = (data.duracion || 60) * 60;
 
       document.getElementById("simulacros-list").style.display = "none";
+      document.getElementById("ai-generate-section").style.display = "none";
       document.getElementById("test-area").style.display = "block";
-      document.getElementById("timer").style.display = "block";
 
+      const hasFiles = data.archivos && data.archivos.length > 0;
+      const hasQuestions = data.preguntas && data.preguntas.length > 0;
+
+      if (hasFiles && !hasQuestions) {
+        document.getElementById("timer").style.display = "none";
+        let filesHtml = `<h2 style="margin-bottom: 1rem;">${data.titulo}</h2>`;
+        filesHtml += `<p style="color: #666; margin-bottom: 1.5rem;">${data.descripcion || ""}</p>`;
+        filesHtml += `<div style="display: flex; flex-direction: column; gap: 1rem;">`;
+        data.archivos.forEach(file => {
+          const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+          if (isImage) {
+            filesHtml += `
+              <div class="card" style="padding: 1rem;">
+                <p style="font-weight: bold; margin-bottom: 0.5rem;">🖼️ ${file.name}</p>
+                <img src="${file.url}" alt="${file.name}" style="width: 100%; border-radius: 8px; cursor: pointer;" onclick="window.open('${file.url}', '_blank')">
+              </div>
+            `;
+          } else {
+            filesHtml += `
+              <div class="card" style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 2rem;">📄</span>
+                <div style="flex: 1;">
+                  <p style="font-weight: bold;">${file.name}</p>
+                  <a href="${file.url}" target="_blank" style="color: #00c896;">Abrir PDF</a>
+                </div>
+              </div>
+            `;
+          }
+        });
+        filesHtml += `</div>`;
+        filesHtml += `<button class="btn" onclick="location.reload()" style="margin-top: 1.5rem;">Volver</button>`;
+        document.getElementById("test-area").innerHTML = filesHtml;
+        return;
+      }
+
+      if (!confirm("El cronómetro comenzará ahora. ¿Estás listo?")) return;
+      document.getElementById("timer").style.display = "block";
       startTimer();
       renderQuestions();
     };
@@ -142,7 +185,24 @@
 
     function renderQuestions() {
       const area = document.getElementById("test-area");
-      let html = `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
+      let html = "";
+
+      if (currentTest.archivos && currentTest.archivos.length > 0) {
+        html += `<div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
+          <h3 style="margin-bottom: 0.8rem; color: #1a1a2e;">📎 Archivos del examen</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">`;
+        currentTest.archivos.forEach(file => {
+          const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+          if (isImage) {
+            html += `<a href="${file.url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem;">🖼️ ${file.name}</a>`;
+          } else {
+            html += `<a href="${file.url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem;">📄 ${file.name}</a>`;
+          }
+        });
+        html += `</div></div>`;
+      }
+
+      html += `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
       currentTest.preguntas.forEach((q, qi) => {
         html += `
           <div class="question-card">
