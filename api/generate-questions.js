@@ -17,7 +17,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Topic and type are required' });
   }
 
-  const API_KEY = process.env.OPENROUTER_API_KEY;
+  const API_KEY = process.env.DEEPSEEK_API_KEY;
 
   if (!API_KEY) {
     return res.status(500).json({ error: 'API key not configured' });
@@ -78,16 +78,14 @@ Reglas:
   }
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://area52-uni.vercel.app',
-        'X-Title': 'Área 52 UNI'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Genera ${numQuestions} preguntas de ${type} sobre: ${topic}` }
@@ -99,7 +97,7 @@ Reglas:
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenRouter error:', response.status, errorData);
+      console.error('DeepSeek error:', response.status, errorData);
       return res.status(502).json({ error: 'Error from AI service' });
     }
 
