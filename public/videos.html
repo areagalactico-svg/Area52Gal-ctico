@@ -44,7 +44,7 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+    import { supabase } from "/js/supabase-config.js";
 
     let allVideos = [];
     let currentFilter = "Todos";
@@ -55,46 +55,43 @@
     }
 
     async function loadVideos() {
-      const q = query(collection(db, "videos"), orderBy("fecha", "desc"));
-      const snap = await getDocs(q);
-      allVideos = [];
-      const cats = new Set(["Todos"]);
+      const { data } = await supabase
+        .from("videos")
+        .select("*")
+        .order("fecha", { ascending: false });
 
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        allVideos.push(data);
-        if (data.categoria) cats.add(data.categoria);
-      });
-
+      const grid = document.getElementById("videos-grid");
       const filterBar = document.getElementById("filter-bar");
+
+      if (!data || data.length === 0) {
+        grid.innerHTML = '<div class="card" style="grid-column: 1/-1; text-align: center;"><p style="color: #888;">No hay videos disponibles aún.</p></div>';
+        return;
+      }
+
+      allVideos = data;
+      const cats = new Set(["Todos"]);
+      data.forEach(v => { if (v.categoria) cats.add(v.categoria); });
+
+      filterBar.innerHTML = "";
       cats.forEach(cat => {
         const btn = document.createElement("button");
         btn.className = "filter-btn" + (cat === "Todos" ? " active" : "");
         btn.textContent = cat;
-        btn.onclick = () => filterVideos(cat);
+        btn.onclick = () => {
+          currentFilter = cat;
+          document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderVideos(cat === "Todos" ? allVideos : allVideos.filter(v => v.categoria === cat));
+        };
         filterBar.appendChild(btn);
       });
 
       renderVideos(allVideos);
     }
 
-    function filterVideos(cat) {
-      currentFilter = cat;
-      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-      event.target.classList.add("active");
-      const filtered = cat === "Todos" ? allVideos : allVideos.filter(v => v.categoria === cat);
-      renderVideos(filtered);
-    }
-
     function renderVideos(videos) {
       const grid = document.getElementById("videos-grid");
       grid.innerHTML = "";
-
-      if (videos.length === 0) {
-        grid.innerHTML = '<div class="card" style="grid-column: 1/-1; text-align: center;"><p style="color: #888;">No hay videos disponibles aún.</p></div>';
-        return;
-      }
-
       videos.forEach(v => {
         const ytId = extractYoutubeId(v.urlYoutube);
         const card = document.createElement("div");

@@ -73,44 +73,40 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy, where } from "/js/firebase-config.js";
+    import { supabase } from "/js/supabase-config.js";
 
     async function fetchMaterialsContext(materia) {
-      try {
-        const q = query(collection(db, "materiales_referencia"), where("materia", "==", materia));
-        const snap = await getDocs(q);
-        if (snap.empty) return "";
-        let context = "";
-        snap.forEach(doc => {
-          const data = doc.data();
-          context += `- ${data.titulo}: ${data.descripcion || "Sin descripción"}\n`;
-        });
-        return context;
-      } catch (e) {
-        return "";
-      }
+      const { data } = await supabase
+        .from("materiales_referencia")
+        .select("titulo, descripcion")
+        .eq("materia", materia);
+      if (!data || data.length === 0) return "";
+      return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
     }
 
     async function loadTests() {
-      const q = query(collection(db, "test_vocacionales"), orderBy("fecha", "desc"));
-      const snap = await getDocs(q);
+      const { data } = await supabase
+        .from("test_vocacionales")
+        .select("*")
+        .order("fecha", { ascending: false });
+
       const list = document.getElementById("tests-list");
 
-      if (snap.empty) {
+      if (!data || data.length === 0) {
         list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay tests guardados.</p></div>';
       } else {
-        snap.forEach(docSnap => {
-          const data = docSnap.data();
-          const numPreguntas = data.preguntas?.length || 0;
+        list.innerHTML = "";
+        data.forEach(item => {
+          const numPreguntas = item.preguntas?.length || 0;
           if (numPreguntas === 0) return;
           const card = document.createElement("div");
           card.className = "test-card";
           card.innerHTML = `
-            <h3>${data.titulo}</h3>
-            <p style="color: #666; margin: 0.5rem 0;">${data.descripcion || ""}</p>
+            <h3>${item.titulo}</h3>
+            <p style="color: #666; margin: 0.5rem 0;">${item.descripcion || ""}</p>
             <p style="color: #00c896; font-weight: bold;">${numPreguntas} preguntas</p>
           `;
-          card.onclick = () => startTest(docSnap.id, data);
+          card.onclick = () => startTest(item.id, item);
           list.appendChild(card);
         });
         if (list.children.length === 0) {

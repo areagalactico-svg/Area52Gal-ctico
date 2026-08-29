@@ -41,30 +41,36 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+    import { supabase } from "/js/supabase-config.js";
 
     let allExamenes = [];
 
     async function loadExamenes() {
-      const q = query(collection(db, "examenes"), orderBy("fecha", "desc"));
-      const snap = await getDocs(q);
-      allExamenes = [];
-      const mats = new Set(["Todos"]);
+      const { data } = await supabase
+        .from("examenes")
+        .select("*")
+        .order("fecha", { ascending: false });
 
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        allExamenes.push(data);
-        if (data.materia) mats.add(data.materia);
-      });
-
+      const list = document.getElementById("examenes-list");
       const filterBar = document.getElementById("filter-bar");
+
+      if (!data || data.length === 0) {
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay exámenes disponibles aún.</p></div>';
+        return;
+      }
+
+      allExamenes = data;
+      const mats = new Set(["Todos"]);
+      data.forEach(ex => { if (ex.materia) mats.add(ex.materia); });
+
+      filterBar.innerHTML = "";
       mats.forEach(m => {
         const btn = document.createElement("button");
         btn.className = "filter-btn" + (m === "Todos" ? " active" : "");
         btn.textContent = m;
-        btn.onclick = (e) => {
+        btn.onclick = () => {
           document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-          e.target.classList.add("active");
+          btn.classList.add("active");
           renderExamenes(m === "Todos" ? allExamenes : allExamenes.filter(ex => ex.materia === m));
         };
         filterBar.appendChild(btn);
@@ -76,14 +82,8 @@
     function renderExamenes(examenes) {
       const list = document.getElementById("examenes-list");
       list.innerHTML = "";
-
-      if (examenes.length === 0) {
-        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay exámenes disponibles aún.</p></div>';
-        return;
-      }
-
       examenes.forEach(ex => {
-        const archivos = ex.archivos || (ex.fileUrl ? [{ name: ex.fileName || "Documento", url: ex.fileUrl }] : []);
+        const archivos = ex.archivos || [];
         const card = document.createElement("div");
         card.className = "examen-card";
         card.style.flexDirection = "column";
@@ -95,17 +95,11 @@
           filesHtml = `<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">`;
           archivos.forEach(file => {
             const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
-            if (isImage) {
-              filesHtml += `
-                <a href="${file.url}" download="${file.name}" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0;">
-                  🖼️ ${file.name} ⬇
-                </a>`;
-            } else {
-              filesHtml += `
-                <a href="${file.url}" download="${file.name}" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0;">
-                  📄 ${file.name} ⬇
-                </a>`;
-            }
+            const icon = isImage ? "🖼️" : "📄";
+            filesHtml += `
+              <a href="${file.url}" download="${file.name}" style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0;">
+                ${icon} ${file.name} ⬇
+              </a>`;
           });
           filesHtml += `</div>`;
         }

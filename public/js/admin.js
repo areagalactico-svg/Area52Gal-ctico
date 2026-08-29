@@ -1,4 +1,4 @@
-import { auth, db, storage, ADMIN_EMAIL, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, ref, uploadBytes, getDownloadURL, listAll, deleteObject, signInWithPopup, signOut, onAuthStateChanged, provider } from "./firebase-config.js";
+import { supabase, ADMIN_EMAIL } from "./supabase-config.js";
 
 let currentEditId = null;
 let currentType = null;
@@ -11,40 +11,40 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("logout-btn").addEventListener("click", logout);
 });
 
-function checkAuth() {
-  onAuthStateChanged(auth, (user) => {
-    if (user && user.email === ADMIN_EMAIL) {
-      document.getElementById("login-page").style.display = "none";
-      document.getElementById("admin-panel").style.display = "block";
-      document.getElementById("user-name").textContent = user.displayName || user.email;
-      document.getElementById("user-photo").src = user.photoURL || "";
-      loadAllData();
-    } else {
-      document.getElementById("login-page").style.display = "flex";
-      document.getElementById("admin-panel").style.display = "none";
-      document.getElementById("google-login-btn").addEventListener("click", login);
-    }
-  });
+async function checkAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session && session.user.email === ADMIN_EMAIL) {
+    showAdmin(session.user);
+  } else {
+    document.getElementById("login-page").style.display = "flex";
+    document.getElementById("admin-panel").style.display = "none";
+    document.getElementById("google-login-btn").addEventListener("click", login);
+  }
+}
+
+function showAdmin(user) {
+  document.getElementById("login-page").style.display = "none";
+  document.getElementById("admin-panel").style.display = "block";
+  document.getElementById("user-name").textContent = user.user_metadata?.full_name || user.email;
+  document.getElementById("user-photo").src = user.user_metadata?.avatar_url || "";
+  loadAllData();
 }
 
 async function login() {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    if (result.user.email !== ADMIN_EMAIL) {
-      await signOut(auth);
-      const err = document.getElementById("login-error");
-      err.textContent = "Acceso denegado. Solo el administrador puede acceder.";
-      err.style.display = "block";
-    }
-  } catch (error) {
-    const err = document.getElementById("login-error");
-    err.textContent = "Error: " + error.message;
-    err.style.display = "block";
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin + "/admin.html" }
+  });
+  if (error) {
+    document.getElementById("login-error").textContent = "Error: " + error.message;
+    document.getElementById("login-error").style.display = "block";
   }
 }
 
 async function logout() {
-  await signOut(auth);
+  await supabase.auth.signOut();
+  localStorage.removeItem("area52_user");
+  location.reload();
 }
 
 function setupTabs() {
@@ -58,65 +58,88 @@ function setupTabs() {
   });
 }
 
+const COLLECTIONS = {
+  tests: { table: "test_vocacionales", listId: "tests-list", type: "test" },
+  simulacros: { table: "simulacros_ien", listId: "simulacros-list", type: "simulacro" },
+  videos: { table: "videos", listId: "videos-list", type: "video" },
+  temarios: { table: "temarios", listId: "temarios-list", type: "temario" },
+  examenes: { table: "examenes", listId: "examenes-list", type: "examen" },
+  materiales: { table: "materiales_referencia", listId: "materiales-list", type: "material" }
+};
+
 async function loadAllData() {
   await Promise.all([
-    loadCollection("test_vocacionales", "tests-list", "test"),
-    loadCollection("simulacros_ien", "simulacros-list", "simulacro"),
-    loadCollection("videos", "videos-list", "video"),
-    loadCollection("temarios", "temarios-list", "temario"),
-    loadCollection("examenes", "examenes-list", "examen"),
-    loadCollection("materiales_referencia", "materiales-list", "material")
+    loadCollection("tests"),
+    loadCollection("simulacros"),
+    loadCollection("videos"),
+    loadCollection("temarios"),
+    loadCollection("examenes"),
+    loadCollection("materiales")
   ]);
   updateStats();
 }
 
-async function loadCollection(colName, listId, type) {
-  const q = query(collection(db, colName), orderBy("fecha", "desc"));
-  const snapshot = await getDocs(q);
-  const list = document.getElementById(listId);
-  list.innerHTML = "";
+async function loadCollection(key) {
+  const col = COLLECTIONS[key];
+  const { data, error } = await supabase
+    .from(col.table)
+    .select("*")
+    .order("fecha", { ascending: false });
 
-  if (snapshot.empty) {
+  const list = document.getElementById(col.listId);
+  if (!list) return;
+
+  if (error || !data || data.length === 0) {
     list.innerHTML = '<div class="card"><p style="color: #888; text-align: center;">No hay elementos creados aún.</p></div>';
     return;
   }
 
-  snapshot.forEach(docSnap => {
-    const data = docSnap.data();
-    const item = document.createElement("div");
-    item.className = "list-item";
-    item.innerHTML = `
+  list.innerHTML = "";
+  data.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
       <div class="item-info">
-        <h4>${data.titulo || data.nombre || "Sin título"}</h4>
-        <p>${data.descripcion || data.materia || data.categoria || ""}</p>
+        <h4>${item.titulo || item.nombre || "Sin título"}</h4>
+        <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}</p>
       </div>
       <div class="item-actions">
-        <button class="btn btn-sm" onclick="editItem('${colName}', '${docSnap.id}', '${type}')">Editar</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteItem('${colName}', '${docSnap.id}')">Eliminar</button>
+        <button class="btn btn-sm" onclick="editItem('${col.table}', '${item.id}', '${col.type}')">Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${col.table}', '${item.id}')">Eliminar</button>
       </div>
     `;
-    list.appendChild(item);
+    list.appendChild(div);
   });
 }
 
 async function updateStats() {
-  const collections = ["test_vocacionales", "simulacros_ien", "videos", "temarios", "examenes", "materiales_referencia"];
-  const labels = ["Tests", "Simulacros", "Videos", "Temarios", "Exámenes", "Materiales"];
   const grid = document.getElementById("stats-grid");
   grid.innerHTML = "";
-
-  for (let i = 0; i < collections.length; i++) {
-    const snap = await getDocs(collection(db, collections[i]));
+  for (const [key, col] of Object.entries(COLLECTIONS)) {
+    const { count } = await supabase.from(col.table).select("*", { count: "exact", head: true });
+    const label = key.charAt(0).toUpperCase() + key.slice(1);
     grid.innerHTML += `
       <div class="stat-card">
-        <h3>${snap.size}</h3>
-        <p>${labels[i]}</p>
+        <h3>${count || 0}</h3>
+        <p>${label}</p>
       </div>
     `;
   }
 }
 
-window.openModal = function(type, editData = null, editId = null) {
+async function uploadFiles(files, bucket) {
+  const uploaded = [];
+  for (const file of files) {
+    const fileName = `${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
+    if (error) { console.error("Upload error:", error); continue; }
+    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    uploaded.push({ name: file.name, url: data.publicUrl });
+  }
+  return uploaded;
+}
+
+window.openModal = async function(type, editData = null, editId = null) {
   currentType = type;
   currentEditId = editId;
   questions = editData?.preguntas ? [...editData.preguntas] : [];
@@ -147,14 +170,14 @@ window.openModal = function(type, editData = null, editId = null) {
           <input type="number" id="field-duracion" value="${editData?.duracion || 60}" min="1">
         </div>` : ""}
         <div class="form-group">
-          <label>Archivos del examen (PDF o imágenes)</label>
+          <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Puedes seleccionar varios archivos a la vez (PDF, JPG, PNG)</small>
+          <small style="color: #888;">Selecciona varios archivos (PDF, JPG, PNG)</small>
           <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
         </div>
         <div class="form-group">
           <label>Preguntas interactivas (${questions.length} actuales)</label>
-          <p style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">Opcional: agrega preguntas de opción múltiple para evaluación</p>
+          <p style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">Opcional: preguntas de opción múltiple</p>
           <div id="questions-container"></div>
           <button class="btn btn-sm" onclick="addQuestion()" style="margin-top: 0.5rem;">+ Agregar Pregunta</button>
         </div>
@@ -219,7 +242,7 @@ window.openModal = function(type, editData = null, editId = null) {
       break;
 
     case "examen":
-      existingFiles = editData?.archivos ? [...editData.archivos] : (editData?.fileUrl ? [{ name: editData.fileName || "Documento", url: editData.fileUrl }] : []);
+      existingFiles = editData?.archivos ? [...editData.archivos] : [];
       title.textContent = editData ? "Editar Examen" : "Nuevo Examen";
       body.innerHTML = `
         <div class="form-group">
@@ -247,9 +270,9 @@ window.openModal = function(type, editData = null, editId = null) {
           <textarea id="field-descripcion" placeholder="Descripción del examen...">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
-          <label>Archivos del examen (PDF o imágenes)</label>
+          <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-examen" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Puedes seleccionar varios archivos (PDF, JPG, PNG)</small>
+          <small style="color: #888;">Selecciona varios archivos (PDF, JPG, PNG)</small>
           <div id="existing-examen-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -285,7 +308,7 @@ window.openModal = function(type, editData = null, editId = null) {
         <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-material" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo. La IA los usará como referencia.</small>
+          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo.</small>
           <div id="existing-material-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -330,7 +353,6 @@ function renderQuestions() {
   const container = document.getElementById("questions-container");
   if (!container) return;
   container.innerHTML = "";
-
   questions.forEach((q, qi) => {
     const div = document.createElement("div");
     div.className = "card";
@@ -355,83 +377,51 @@ function renderQuestions() {
   });
 }
 
-function renderExistingFiles() {
-  const container = document.getElementById("existing-files-container");
+function renderFileList(containerId, files, removeFn) {
+  const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = "";
-
-  existingFiles.forEach((file, fi) => {
+  files.forEach((file, fi) => {
     const div = document.createElement("div");
     div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
-    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
+    const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
     div.innerHTML = `
       <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
       </span>
       <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
-      <button class="btn btn-sm btn-danger" onclick="removeExistingFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
+      <button class="btn btn-sm btn-danger" onclick="${removeFn}(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
     `;
     container.appendChild(div);
   });
 }
 
-window.removeExistingFile = function(index) {
-  existingFiles.splice(index, 1);
-  renderExistingFiles();
+function renderExistingFiles() { renderFileList("existing-files-container", existingFiles, "removeExistingFile"); }
+function renderExistingExamenFiles() { renderFileList("existing-examen-files", existingFiles, "removeExistingExamenFile"); }
+function renderExistingMaterialFiles() { renderFileList("existing-material-files", existingFiles, "removeExistingMaterialFile"); }
+
+window.removeExistingFile = (i) => { existingFiles.splice(i, 1); renderExistingFiles(); };
+window.removeExistingExamenFile = (i) => { existingFiles.splice(i, 1); renderExistingExamenFiles(); };
+window.removeExistingMaterialFile = (i) => { existingFiles.splice(i, 1); renderExistingMaterialFiles(); };
+
+const TABLE_MAP = {
+  test: "test_vocacionales",
+  simulacro: "simulacros_ien",
+  video: "videos",
+  temario: "temarios",
+  examen: "examenes",
+  material: "materiales_referencia"
 };
 
-function renderExistingExamenFiles() {
-  const container = document.getElementById("existing-examen-files");
-  if (!container) return;
-  container.innerHTML = "";
-
-  existingFiles.forEach((file, fi) => {
-    const div = document.createElement("div");
-    div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
-    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
-    div.innerHTML = `
-      <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-        ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
-      </span>
-      <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
-      <button class="btn btn-sm btn-danger" onclick="removeExistingExamenFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
-    `;
-    container.appendChild(div);
-  });
-}
-
-window.removeExistingExamenFile = function(index) {
-  existingFiles.splice(index, 1);
-  renderExistingExamenFiles();
-};
-
-function renderExistingMaterialFiles() {
-  const container = document.getElementById("existing-material-files");
-  if (!container) return;
-  container.innerHTML = "";
-
-  existingFiles.forEach((file, fi) => {
-    const div = document.createElement("div");
-    div.style.cssText = "display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem; background: #f0f4f8; border-radius: 6px; margin-bottom: 0.3rem;";
-    const isImage = file.url && /\.(jpg|jpeg|png|webp)$/i.test(file.name || file.url);
-    div.innerHTML = `
-      <span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-        ${isImage ? "🖼️" : "📄"} ${file.name || "Archivo"}
-      </span>
-      <a href="${file.url}" target="_blank" class="btn btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Ver</a>
-      <button class="btn btn-sm btn-danger" onclick="removeExistingMaterialFile(${fi})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">X</button>
-    `;
-    container.appendChild(div);
-  });
-}
-
-window.removeExistingMaterialFile = function(index) {
-  existingFiles.splice(index, 1);
-  renderExistingMaterialFiles();
+const BUCKET_MAP = {
+  simulacro: "simulacros",
+  examen: "examenes",
+  material: "materiales"
 };
 
 async function saveItem() {
   const data = {};
+  const table = TABLE_MAP[currentType];
 
   switch(currentType) {
     case "test":
@@ -441,17 +431,13 @@ async function saveItem() {
       data.preguntas = questions;
       if (currentType === "simulacro") {
         data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
-        const fileInput = document.getElementById("field-archivos");
-        const uploadedFiles = [];
-        if (fileInput.files.length > 0) {
-          for (const file of fileInput.files) {
-            const storageRef = ref(storage, `simulacros/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            uploadedFiles.push({ name: file.name, url });
-          }
-        }
-        data.archivos = [...existingFiles, ...uploadedFiles];
+      }
+      const fileInput = document.getElementById("field-archivos");
+      if (fileInput?.files.length > 0) {
+        const uploaded = await uploadFiles(fileInput.files, BUCKET_MAP[currentType]);
+        data.archivos = [...existingFiles, ...uploaded];
+      } else {
+        data.archivos = existingFiles;
       }
       break;
 
@@ -473,52 +459,38 @@ async function saveItem() {
       data.year = parseInt(document.getElementById("field-year").value);
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      const fileInputExamen = document.getElementById("field-archivos-examen");
-      const uploadedExamenFiles = [];
-      if (fileInputExamen.files.length > 0) {
-        for (const file of fileInputExamen.files) {
-          const storageRef = ref(storage, `examenes/${Date.now()}_${file.name}`);
-          await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(storageRef);
-          uploadedExamenFiles.push({ name: file.name, url });
-        }
+      const fileInputEx = document.getElementById("field-archivos-examen");
+      if (fileInputEx?.files.length > 0) {
+        const uploaded = await uploadFiles(fileInputEx.files, BUCKET_MAP[currentType]);
+        data.archivos = [...existingFiles, ...uploaded];
+      } else {
+        data.archivos = existingFiles;
       }
-      data.archivos = [...existingFiles, ...uploadedExamenFiles];
       break;
 
     case "material":
       data.titulo = document.getElementById("field-titulo").value;
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      const fileInputMaterial = document.getElementById("field-archivos-material");
-      const uploadedMaterialFiles = [];
-      if (fileInputMaterial.files.length > 0) {
-        for (const file of fileInputMaterial.files) {
-          const storageRef = ref(storage, `materiales/${Date.now()}_${file.name}`);
-          await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(storageRef);
-          uploadedMaterialFiles.push({ name: file.name, url });
-        }
+      const fileInputMat = document.getElementById("field-archivos-material");
+      if (fileInputMat?.files.length > 0) {
+        const uploaded = await uploadFiles(fileInputMat.files, BUCKET_MAP[currentType]);
+        data.archivos = [...existingFiles, ...uploaded];
+      } else {
+        data.archivos = existingFiles;
       }
-      data.archivos = [...existingFiles, ...uploadedMaterialFiles];
       break;
   }
 
   data.fecha = new Date().toISOString();
 
-  const colMap = {
-    test: "test_vocacionales",
-    simulacro: "simulacros_ien",
-    video: "videos",
-    temario: "temarios",
-    examen: "examenes"
-  };
-
   try {
     if (currentEditId) {
-      await updateDoc(doc(db, colMap[currentType], currentEditId), data);
+      const { error } = await supabase.from(table).update(data).eq("id", currentEditId);
+      if (error) throw error;
     } else {
-      await addDoc(collection(db, colMap[currentType]), data);
+      const { error } = await supabase.from(table).insert([data]);
+      if (error) throw error;
     }
     closeModal();
     loadAllData();
@@ -528,27 +500,18 @@ async function saveItem() {
   }
 }
 
-window.editItem = async function(colName, id, type) {
-  const snap = await getDocs(collection(db, colName));
-  let editData = null;
-  snap.forEach(docSnap => {
-    if (docSnap.id === id) {
-      editData = { id: docSnap.id, ...docSnap.data() };
-    }
-  });
-  if (editData) {
-    openModal(type, editData, id);
-  }
+window.editItem = async function(table, id, type) {
+  const { data, error } = await supabase.from(table).select("*").eq("id", id).single();
+  if (data) openModal(type, data, id);
 };
 
-window.deleteItem = async function(colName, id) {
-  if (confirm("¿Estás seguro de eliminar este elemento?")) {
-    try {
-      await deleteDoc(doc(db, colName, id));
-      loadAllData();
-      alert("Eliminado correctamente");
-    } catch (error) {
-      alert("Error al eliminar: " + error.message);
-    }
+window.deleteItem = async function(table, id) {
+  if (!confirm("¿Estás seguro de eliminar este elemento?")) return;
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (!error) {
+    loadAllData();
+    alert("Eliminado correctamente");
+  } else {
+    alert("Error al eliminar: " + error.message);
   }
 };

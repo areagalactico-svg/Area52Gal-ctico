@@ -39,27 +39,30 @@
   </div>
 
   <script type="module">
-    import { db, collection, getDocs, query, orderBy } from "/js/firebase-config.js";
+    import { supabase } from "/js/supabase-config.js";
 
     async function loadTemarios() {
-      const q = query(collection(db, "temarios"), orderBy("fecha", "desc"));
-      const snap = await getDocs(q);
+      const { data } = await supabase
+        .from("temarios")
+        .select("*")
+        .order("fecha", { ascending: false });
+
       const list = document.getElementById("temarios-list");
 
-      if (snap.empty) {
+      if (!data || data.length === 0) {
         list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay temarios disponibles aún.</p></div>';
         return;
       }
 
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
+      list.innerHTML = "";
+      data.forEach(item => {
         const card = document.createElement("div");
         card.className = "temario-card";
         card.innerHTML = `
-          <h3>${data.titulo}</h3>
-          <span class="curso-badge">${data.curso || ""}</span>
+          <h3>${item.titulo}</h3>
+          <span class="curso-badge">${item.curso || ""}</span>
           <span class="toggle-btn" onclick="this.parentElement.classList.toggle('expanded')">Ver contenido ▼</span>
-          <div class="contenido">${data.contenido || ""}</div>
+          <div class="contenido">${item.contenido || ""}</div>
         `;
         list.appendChild(card);
       });

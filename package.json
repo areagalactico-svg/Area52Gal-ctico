@@ -7,10 +7,7 @@
     "dev": "http-server public -p 3000 -c-1",
     "build": "echo 'Build complete'",
     "start": "http-server public -p 5000",
-    "deploy:vercel": "vercel",
-    "deploy:firebase": "firebase deploy",
-    "firebase:login": "firebase login",
-    "firebase:init": "firebase init"
+    "deploy": "vercel"
   },
   "keywords": [
     "UNI",
@@ -22,8 +19,5 @@
   "license": "MIT",
   "devDependencies": {
     "http-server": "^14.1.1"
-  },
-  "dependencies": {
-    "firebase": "^10.7.0"
   }
 }
