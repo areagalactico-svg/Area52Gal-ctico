@@ -31,14 +31,34 @@ function showAdmin(user) {
 }
 
 async function login() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin + "/admin.html" }
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
+
+  if (!email || !password) {
+    document.getElementById("login-error").textContent = "Ingresa email y contraseña";
+    document.getElementById("login-error").style.display = "block";
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
   });
+
   if (error) {
     document.getElementById("login-error").textContent = "Error: " + error.message;
     document.getElementById("login-error").style.display = "block";
+    return;
   }
+
+  if (data.user.email !== ADMIN_EMAIL) {
+    await supabase.auth.signOut();
+    document.getElementById("login-error").textContent = "Acceso denegado. Solo el administrador puede acceder.";
+    document.getElementById("login-error").style.display = "block";
+    return;
+  }
+
+  showAdmin(data.user);
 }
 
 async function logout() {
