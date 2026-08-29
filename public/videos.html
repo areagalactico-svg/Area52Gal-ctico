@@ -93,7 +93,7 @@
       const grid = document.getElementById("videos-grid");
       grid.innerHTML = "";
       videos.forEach(v => {
-        const ytId = extractYoutubeId(v.urlYoutube);
+        const ytId = extractYoutubeId(v.url_youtube);
         const card = document.createElement("div");
         card.className = "video-card";
         card.innerHTML = `

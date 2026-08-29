@@ -219,7 +219,7 @@ window.openModal = async function(type, editData = null, editId = null) {
         </div>
         <div class="form-group">
           <label>URL de YouTube</label>
-          <input type="url" id="field-url" value="${editData?.urlYoutube || ""}" placeholder="https://www.youtube.com/watch?v=...">
+          <input type="url" id="field-url" value="${editData?.url_youtube || ""}" placeholder="https://www.youtube.com/watch?v=...">
         </div>
         <div class="form-group">
           <label>Categoría</label>
@@ -464,7 +464,7 @@ async function saveItem() {
     case "video":
       data.titulo = document.getElementById("field-titulo").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      data.urlYoutube = document.getElementById("field-url").value;
+      data.url_youtube = document.getElementById("field-url").value;
       data.categoria = document.getElementById("field-categoria").value;
       break;
 
