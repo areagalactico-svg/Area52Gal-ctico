@@ -14,6 +14,9 @@
     .temario-card .contenido { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; white-space: pre-line; color: #555; line-height: 1.8; }
     .temario-card.expanded .contenido { display: block; }
     .toggle-btn { color: #00c896; font-weight: bold; cursor: pointer; margin-top: 0.5rem; display: inline-block; }
+    .filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; justify-content: center; }
+    .filter-btn { padding: 0.5rem 1.2rem; border: 2px solid #00c896; background: transparent; color: #00c896; border-radius: 50px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+    .filter-btn.active, .filter-btn:hover { background: #00c896; color: white; }
   </style>
 </head>
 <body>
@@ -31,16 +34,33 @@
   </header>
 
   <section class="hero-mini">
-    <h1>Temarios</h1>
-    <p>Contenido programático de cada curso</p>
+    <h1 id="page-title">Temarios</h1>
+    <p id="page-subtitle">Contenido programático de cada curso</p>
   </section>
 
   <div class="container" style="max-width: 800px;">
+    <div class="filter-bar" id="filter-bar"></div>
     <div id="temarios-list"></div>
   </div>
 
   <script type="module">
     import { supabase } from "/js/supabase-config.js";
+
+    const PREUNI_CURSOS = ["Preuniversitario"];
+    const UNI_CURSOS = ["Cálculo I", "Cálculo II", "Cálculo III", "Física I", "Física II", "Álgebra Lineal", "Química"];
+
+    const params = new URLSearchParams(window.location.search);
+    const nivel = params.get("nivel");
+
+    if (nivel === "preuniversitario") {
+      document.getElementById("page-title").textContent = "Temarios Preuniversitarios";
+      document.getElementById("page-subtitle").textContent = "Preparación para el ingreso a la UNI";
+    } else if (nivel === "universitario") {
+      document.getElementById("page-title").textContent = "Temarios Universitarios";
+      document.getElementById("page-subtitle").textContent = "Cursos de Cálculo, Física, Álgebra y más";
+    }
+
+    let allTemarios = [];
 
     async function loadTemarios() {
       const { data } = await supabase
@@ -49,14 +69,44 @@
         .order("fecha", { ascending: false });
 
       const list = document.getElementById("temarios-list");
+      const filterBar = document.getElementById("filter-bar");
 
       if (!data || data.length === 0) {
         list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay temarios disponibles aún.</p></div>';
         return;
       }
 
+      if (nivel === "preuniversitario") {
+        allTemarios = data.filter(t => PREUNI_CURSOS.includes(t.curso));
+      } else if (nivel === "universitario") {
+        allTemarios = data.filter(t => UNI_CURSOS.includes(t.curso));
+      } else {
+        allTemarios = data;
+      }
+
+      const cursos = new Set(["Todos"]);
+      allTemarios.forEach(t => { if (t.curso) cursos.add(t.curso); });
+
+      filterBar.innerHTML = "";
+      cursos.forEach(c => {
+        const btn = document.createElement("button");
+        btn.className = "filter-btn" + (c === "Todos" ? " active" : "");
+        btn.textContent = c;
+        btn.onclick = () => {
+          document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderTemarios(c === "Todos" ? allTemarios : allTemarios.filter(t => t.curso === c));
+        };
+        filterBar.appendChild(btn);
+      });
+
+      renderTemarios(allTemarios);
+    }
+
+    function renderTemarios(temarios) {
+      const list = document.getElementById("temarios-list");
       list.innerHTML = "";
-      data.forEach(item => {
+      temarios.forEach(item => {
         const card = document.createElement("div");
         card.className = "temario-card";
         card.innerHTML = `
