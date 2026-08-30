@@ -238,6 +238,17 @@ window.openModal = async function(type, editData = null, editId = null) {
       title.textContent = editData ? "Editar Temario" : "Nuevo Temario";
       body.innerHTML = `
         <div class="form-group">
+          <label>Universidad</label>
+          <select id="field-universidad">
+            <option value="UNI" ${editData?.universidad === "UNI" ? "selected" : ""}>UNI</option>
+            <option value="San Marcos" ${editData?.universidad === "San Marcos" ? "selected" : ""}>San Marcos</option>
+            <option value="Católica" ${editData?.universidad === "Católica" ? "selected" : ""}>Católica</option>
+            <option value="La Molina" ${editData?.universidad === "La Molina" ? "selected" : ""}>La Molina</option>
+            <option value="San Martín" ${editData?.universidad === "San Martín" ? "selected" : ""}>San Martín</option>
+            <option value="Pacifico" ${editData?.universidad === "Pacifico" ? "selected" : ""}>Pacífico</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Título</label>
           <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Temario Cálculo I">
         </div>
@@ -252,6 +263,8 @@ window.openModal = async function(type, editData = null, editId = null) {
             <option value="Álgebra Lineal" ${editData?.curso === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
             <option value="Química" ${editData?.curso === "Química" ? "selected" : ""}>Química</option>
             <option value="Preuniversitario" ${editData?.curso === "Preuniversitario" ? "selected" : ""}>Preuniversitario</option>
+            <option value="Razonamiento Lógico" ${editData?.curso === "Razonamiento Lógico" ? "selected" : ""}>Razonamiento Lógico</option>
+            <option value="Comprensión Lectora" ${editData?.curso === "Comprensión Lectora" ? "selected" : ""}>Comprensión Lectora</option>
           </select>
         </div>
         <div class="form-group">
@@ -265,6 +278,17 @@ window.openModal = async function(type, editData = null, editId = null) {
       existingFiles = editData?.archivos ? [...editData.archivos] : [];
       title.textContent = editData ? "Editar Examen" : "Nuevo Examen";
       body.innerHTML = `
+        <div class="form-group">
+          <label>Universidad</label>
+          <select id="field-universidad">
+            <option value="UNI" ${editData?.universidad === "UNI" ? "selected" : ""}>UNI</option>
+            <option value="San Marcos" ${editData?.universidad === "San Marcos" ? "selected" : ""}>San Marcos</option>
+            <option value="Católica" ${editData?.universidad === "Católica" ? "selected" : ""}>Católica</option>
+            <option value="La Molina" ${editData?.universidad === "La Molina" ? "selected" : ""}>La Molina</option>
+            <option value="San Martín" ${editData?.universidad === "San Martín" ? "selected" : ""}>San Martín</option>
+            <option value="Pacifico" ${editData?.universidad === "Pacifico" ? "selected" : ""}>Pacífico</option>
+          </select>
+        </div>
         <div class="form-group">
           <label>Título</label>
           <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen Parcial 2023">
@@ -303,6 +327,17 @@ window.openModal = async function(type, editData = null, editId = null) {
       existingFiles = editData?.archivos ? [...editData.archivos] : [];
       title.textContent = editData ? "Editar Material" : "Subir Material de Referencia";
       body.innerHTML = `
+        <div class="form-group">
+          <label>Universidad</label>
+          <select id="field-universidad">
+            <option value="UNI" ${editData?.universidad === "UNI" ? "selected" : ""}>UNI</option>
+            <option value="San Marcos" ${editData?.universidad === "San Marcos" ? "selected" : ""}>San Marcos</option>
+            <option value="Católica" ${editData?.universidad === "Católica" ? "selected" : ""}>Católica</option>
+            <option value="La Molina" ${editData?.universidad === "La Molina" ? "selected" : ""}>La Molina</option>
+            <option value="San Martín" ${editData?.universidad === "San Martín" ? "selected" : ""}>San Martín</option>
+            <option value="Pacifico" ${editData?.universidad === "Pacifico" ? "selected" : ""}>Pacífico</option>
+          </select>
+        </div>
         <div class="form-group">
           <label>Nombre del material</label>
           <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN 2023 - Cálculo">
@@ -472,6 +507,7 @@ async function saveItem() {
       data.titulo = document.getElementById("field-titulo").value;
       data.curso = document.getElementById("field-curso").value;
       data.contenido = document.getElementById("field-contenido").value;
+      data.universidad = document.getElementById("field-universidad").value;
       break;
 
     case "examen":
@@ -479,6 +515,7 @@ async function saveItem() {
       data.year = parseInt(document.getElementById("field-year").value);
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
+      data.universidad = document.getElementById("field-universidad").value;
       const fileInputEx = document.getElementById("field-archivos-examen");
       if (fileInputEx?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputEx.files, BUCKET_MAP[currentType]);
@@ -492,6 +529,7 @@ async function saveItem() {
       data.titulo = document.getElementById("field-titulo").value;
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
+      data.universidad = document.getElementById("field-universidad").value;
       const fileInputMat = document.getElementById("field-archivos-material");
       if (fileInputMat?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputMat.files, BUCKET_MAP[currentType]);

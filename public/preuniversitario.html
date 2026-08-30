@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preuniversitario - Área 52 UNI</title>
+    <title>Preuniversitario - Área 52</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
         header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,200,150,0.2); }
         .logo { font-size: 1.3rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: white; }
         nav a { color: white; text-decoration: none; margin-left: 1.5rem; transition: color 0.3s; }
-        nav a:hover { color: #00c896; }
-        .highlight { color: #00c896; font-weight: bold; }
+        nav a:hover { color: #ff6b6b; }
+        .highlight { color: #ff6b6b; font-weight: bold; }
         .hero { background: linear-gradient(135deg, #0f3460 0%, #1a1a2e 50%, #16213e 100%); color: white; padding: 4rem 2rem; text-align: center; }
         .hero h1 { font-size: 2.8rem; margin-bottom: 1rem; }
         .hero p { font-size: 1.1rem; margin-bottom: 2rem; max-width: 650px; margin-left: auto; margin-right: auto; opacity: 0.9; }
@@ -21,6 +21,15 @@
         .section { padding: 3rem 2rem; max-width: 1100px; margin: 0 auto; }
         .section h2 { font-size: 2rem; margin-bottom: 0.8rem; text-align: center; color: #1a1a2e; }
         .section > p { text-align: center; color: #666; margin-bottom: 2rem; }
+
+        .university-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+        .uni-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.3s; text-decoration: none; color: #333; }
+        .uni-card:hover, .uni-card.active { border-color: #ff6b6b; box-shadow: 0 5px 20px rgba(255,107,107,0.15); transform: translateY(-3px); }
+        .uni-card.active { background: #fff5f5; }
+        .uni-card .uni-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .uni-card .uni-name { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; }
+        .uni-card .uni-desc { font-size: 0.85rem; color: #888; margin-top: 0.3rem; }
+
         .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; padding: 2rem; background: white; }
         .badge { display: flex; align-items: center; gap: 0.5rem; font-weight: bold; color: #333; }
         .badge-icon { font-size: 1.8rem; }
@@ -36,13 +45,10 @@
         .content-card:hover { transform: translateY(-3px); box-shadow: 0 5px 20px rgba(0,0,0,0.12); }
         .content-card h3 { color: #1a1a2e; margin-bottom: 0.3rem; }
         .badge-tag { display: inline-block; background: #fff0f0; color: #ff6b6b; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-right: 0.5rem; margin-top: 0.3rem; }
+        .badge-tag.green { background: #f0faf7; color: #00c896; }
         .toggle-btn { color: #ff6b6b; font-weight: bold; cursor: pointer; margin-top: 0.5rem; display: inline-block; }
         .contenido { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; white-space: pre-line; color: #555; line-height: 1.8; }
         .content-card.expanded .contenido { display: block; }
-        .testimonials { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-        .testimonial { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .testimonial-author { font-weight: bold; color: #0f3460; margin-top: 0.8rem; }
-        .stars { color: #ffc107; margin-bottom: 0.8rem; }
         .join-section { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); color: white; padding: 3rem 2rem; text-align: center; }
         .join-section h2 { font-size: 2rem; margin-bottom: 0.8rem; color: white; }
         .join-section p { font-size: 1rem; margin-bottom: 1.5rem; color: rgba(255,255,255,0.95); }
@@ -50,121 +56,101 @@
         .join-section .btn:hover { background: white; color: #ff6b6b; }
         footer { background: #1a1a2e; color: white; text-align: center; padding: 2rem; font-size: 0.9rem; }
         footer a { color: #00c896; text-decoration: none; }
-        @media (max-width: 768px) { .hero h1 { font-size: 2rem; } nav { display: none; } }
+        .tab-bar { display: flex; gap: 0; margin-bottom: 2rem; justify-content: center; border-bottom: 2px solid #e0e0e0; }
+        .tab-btn { padding: 0.8rem 1.5rem; border: none; background: transparent; color: #888; font-weight: 600; cursor: pointer; transition: all 0.3s; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: #ff6b6b; border-bottom-color: #ff6b6b; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .download-link { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0; transition: all 0.2s; }
+        .download-link:hover { background: #ff6b6b; color: white; border-color: #ff6b6b; }
+        @media (max-width: 768px) { .hero h1 { font-size: 2rem; } nav { display: none; } .university-grid { grid-template-columns: 1fr 1fr; } }
     </style>
 </head>
 <body>
     <header>
-        <a href="/" class="logo">👽 Área 52 UNI</a>
+        <a href="/" class="logo">👽 Área 52</a>
         <nav>
+            <a href="/preuniversitario.html">Preuniversitario</a>
+            <a href="/universitario.html">Universitario</a>
             <a href="/test-vocacional.html">Test Vocacional</a>
-            <a href="/simulacro-ien.html">Simulacro IEN</a>
             <a href="/videos.html">Videos</a>
-            <a href="/temarios.html?nivel=preuniversitario">Temarios</a>
-            <a href="/examenes.html">Exámenes</a>
-            <a href="/materiales.html">Materiales</a>
-            <a href="#pricing">Planes</a>
             <a href="/admin.html" style="color: #ff6b6b;">⚙ Admin</a>
         </nav>
     </header>
 
     <section class="hero">
         <h1>Preparación <span class="highlight">Preuniversitaria</span></h1>
-        <p>Cursos de matemáticas, ciencias y razonamiento lógico para ingresar a la UNI. Profesores de la UNI con experiencia preparando ingresantes.</p>
+        <p>Selecciona la universidad a la que quieres ingresar y accede a temarios, exámenes y materiales específicos.</p>
         <div>
             <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20me%20interesa%20el%20preuniversitario" class="btn btn-primary">WhatsApp: 933 884 059</a>
-            <a href="#cursos" class="btn">Ver Cursos</a>
         </div>
     </section>
 
-    <section class="badges">
-        <div class="badge"><span class="badge-icon">👨‍🏫</span><span>Profesores UNI</span></div>
-        <div class="badge"><span class="badge-icon">📍</span><span>San Martín de Porres</span></div>
-        <div class="badge"><span class="badge-icon">📱</span><span>Virtual y Presencial</span></div>
-        <div class="badge"><span class="badge-icon">🎯</span><span>Orientado al Ingreso UNI</span></div>
-    </section>
-
-    <section id="cursos" class="section">
-        <h2>Cursos Preuniversitarios</h2>
-        <p>Preparación completa para el examen de admisión de la UNI</p>
-        <div class="features">
-            <div class="feature-card">
-                <h3>🧮 Matemáticas</h3>
-                <p>Álgebra, geometría, aritmética y trigonometría. Enfocado en los temas del examen de ingreso.</p>
+    <section class="section">
+        <h2>¿A qué universidad quieres ingresar?</h2>
+        <p>Selecciona una universidad para ver contenido específico de su examen de admisión</p>
+        <div class="university-grid" id="uni-grid">
+            <div class="uni-card active" data-uni="UNI" onclick="selectUni(this)">
+                <div class="uni-icon">🏛️</div>
+                <div class="uni-name">UNI</div>
+                <div class="uni-desc">Nac. de Ingeniería</div>
             </div>
-            <div class="feature-card">
-                <h3>🔬 Física</h3>
-                <p>Mecánica,电tricidad y magnetismo. Conceptos fundamentales con ejercicios prácticos.</p>
+            <div class="uni-card" data-uni="San Marcos" onclick="selectUni(this)">
+                <div class="uni-icon">🦁</div>
+                <div class="uni-name">San Marcos</div>
+                <div class="uni-desc">Nac. Mayor de San Marcos</div>
             </div>
-            <div class="feature-card">
-                <h3>⚗️ Química</h3>
-                <p>Química general, orgánica e inorgánica. Preparación para el bloque de ciencias.</p>
+            <div class="uni-card" data-uni="Católica" onclick="selectUni(this)">
+                <div class="uni-icon">✝️</div>
+                <div class="uni-name">Católica</div>
+                <div class="uni-desc">PUCP</div>
             </div>
-            <div class="feature-card">
-                <h3>🧠 Razonamiento Lógico</h3>
-                <p>Ejercicios de razonamiento verbal y matemático. Tipos de preguntas del examen IEN.</p>
+            <div class="uni-card" data-uni="La Molina" onclick="selectUni(this)">
+                <div class="uni-icon">🌾</div>
+                <div class="uni-name">La Molina</div>
+                <div class="uni-desc">UNALM</div>
             </div>
-            <div class="feature-card">
-                <h3>📖 Comprensión Lectora</h3>
-                <p>Estrategias de lectura rápida y comprensión de textos académicos.</p>
+            <div class="uni-card" data-uni="San Martín" onclick="selectUni(this)">
+                <div class="uni-icon">📖</div>
+                <div class="uni-name">San Martín</div>
+                <div class="uni-desc">USMP</div>
             </div>
-            <div class="feature-card">
-                <h3>🎯 Simulacros de Ingreso</h3>
-                <p>Exámenes simulacro bajo las mismas condiciones del examen real de la UNI.</p>
+            <div class="uni-card" data-uni="Pacifico" onclick="selectUni(this)">
+                <div class="uni-icon">🌊</div>
+                <div class="uni-name">Pacífico</div>
+                <div class="uni-desc">UP</div>
             </div>
         </div>
     </section>
 
     <section class="section" style="background: #f8f9fa; max-width: 100%; padding: 3rem 2rem;">
         <div style="max-width: 800px; margin: 0 auto;">
-            <h2>Temarios</h2>
-            <p>Contenido programático de cada curso</p>
-            <div class="filter-bar" id="filter-bar"></div>
-            <div id="temarios-list"></div>
-        </div>
-    </section>
+            <h2 id="content-title">Contenido UNI</h2>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="showTab('temarios')">📚 Temarios</button>
+                <button class="tab-btn" onclick="showTab('examenes')">📝 Exámenes</button>
+                <button class="tab-btn" onclick="showTab('materiales')">📎 Materiales</button>
+            </div>
 
-    <section class="section">
-        <h2>Lo que dicen nuestros estudiantes</h2>
-        <div class="testimonials">
-            <div class="testimonial">
-                <div class="stars">★★★★★</div>
-                <p>"Los profesores de Área 52 explican de forma que realmente entiendes. Ingresé a Ingeniería Civil gracias a su preparación."</p>
-                <div class="testimonial-author">- Pedro Sánchez, Ingresante 2024</div>
+            <div id="tab-temarios" class="tab-content active">
+                <div class="filter-bar" id="temarios-filter"></div>
+                <div id="temarios-list"></div>
             </div>
-            <div class="testimonial">
-                <div class="stars">★★★★★</div>
-                <p>"Desde preuniversitario hasta cursos universitarios, Área 52 fue mi aliado. El ambiente de estudio es increíble."</p>
-                <div class="testimonial-author">- Juan Rodríguez, Ingresante 2023</div>
-            </div>
-            <div class="testimonial">
-                <div class="stars">★★★★★</div>
-                <p>"Hice el simulacro y pareció el examen real. Los ejercicios son muy similares a los de la UNI."</p>
-                <div class="testimonial-author">- María López, Ingresante 2024</div>
-            </div>
-        </div>
-    </section>
 
-    <section id="pricing" class="section">
-        <h2>Planes <span class="highlight">Flexibles</span></h2>
-        <p>Elige el plan que mejor se adapte a tu horario</p>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto;">
-            <div class="content-card" style="text-align: center; border-left-color: #ff6b6b;">
-                <h3>Preuniversitario</h3>
-                <div style="font-size: 2rem; color: #ff6b6b; font-weight: bold; margin: 0.8rem 0;">Consultar</div>
-                <ul style="list-style: none; text-align: left; margin: 1rem 0; color: #666;">
-                    <li style="padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0;">✓ Clases semanales en vivo</li>
-                    <li style="padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0;">✓ Acceso a material de estudio</li>
-                    <li style="padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0;">✓ Simulacros de ingreso</li>
-                    <li style="padding: 0.4rem 0;">✓ Seguimiento personalizado</li>
-                </ul>
-                <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20me%20interesa%20el%20plan%20preuniversitario" class="btn btn-primary">Contactar</a>
+            <div id="tab-examenes" class="tab-content">
+                <div class="filter-bar" id="examenes-filter"></div>
+                <div id="examenes-list"></div>
+            </div>
+
+            <div id="tab-materiales" class="tab-content">
+                <div class="filter-bar" id="materiales-filter"></div>
+                <div id="materiales-list"></div>
             </div>
         </div>
     </section>
 
     <section class="join-section">
-        <h2>¿Listo para ingresar a la UNI?</h2>
+        <h2>¿Listo para tu ingreso a la universidad?</h2>
         <p>Contáctanos y comienza tu preparación hoy mismo</p>
         <div>
             <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20me%20interesa%20el%20preuniversitario" class="btn">WhatsApp: 933 884 059</a>
@@ -172,51 +158,144 @@
     </section>
 
     <footer>
-        <p>&copy; 2024 Área 52 UNI. <a href="/">Centro de Asesoría</a></p>
+        <p>&copy; 2024 Área 52. <a href="/">Centro de Asesoría</a></p>
         <p>📍 San Martín de Porres, Lima, Perú</p>
         <p>📱 WhatsApp: 933 884 059 • 📸 <a href="https://www.instagram.com/acad_area52/" target="_blank">@acad_area52</a></p>
     </footer>
 
     <script type="module">
         import { supabase } from "/js/supabase-config.js";
-        const PREUNI_CURSOS = ["Preuniversitario"];
 
-        async function loadTemarios() {
-            const { data } = await supabase.from("temarios").select("*").order("fecha", { ascending: false });
-            const list = document.getElementById("temarios-list");
-            const filterBar = document.getElementById("filter-bar");
-            if (!data || data.length === 0) {
-                list.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay temarios disponibles aún.</p></div>';
+        let selectedUni = "UNI";
+        let allTemarios = [];
+        let allExamenes = [];
+        let allMateriales = [];
+
+        window.selectUni = function(el) {
+            document.querySelectorAll(".uni-card").forEach(c => c.classList.remove("active"));
+            el.classList.add("active");
+            selectedUni = el.dataset.uni;
+            document.getElementById("content-title").textContent = "Contenido " + selectedUni;
+            filterAndRender();
+        };
+
+        window.showTab = function(tab) {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            event.target.classList.add("active");
+            document.getElementById("tab-" + tab).classList.add("active");
+        };
+
+        async function loadData() {
+            const [temarios, examenes, materiales] = await Promise.all([
+                supabase.from("temarios").select("*").order("fecha", { ascending: false }),
+                supabase.from("examenes").select("*").order("fecha", { ascending: false }),
+                supabase.from("materiales_referencia").select("*").order("fecha", { ascending: false })
+            ]);
+            allTemarios = temarios.data || [];
+            allExamenes = examenes.data || [];
+            allMateriales = materiales.data || [];
+            filterAndRender();
+        }
+
+        function filterAndRender() {
+            const filterTemarios = allTemarios.filter(t => (t.universidad || "UNI") === selectedUni);
+            const filterExamenes = allExamenes.filter(e => (e.universidad || "UNI") === selectedUni);
+            const filterMateriales = allMateriales.filter(m => (m.universidad || "UNI") === selectedUni);
+
+            renderWithFilter("temarios-list", "temarios-filter", filterTemarios, "curso", renderTemario);
+            renderWithFilter("examenes-list", "examenes-filter", filterExamenes, "materia", renderExamen);
+            renderWithFilter("materiales-list", "materiales-filter", filterMateriales, "materia", renderMaterial);
+        }
+
+        function renderWithFilter(listId, filterId, items, filterKey, renderFn) {
+            const list = document.getElementById(listId);
+            const filterBar = document.getElementById(filterId);
+            if (!items.length) {
+                list.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay contenido disponible aún para esta universidad.</p></div>';
+                filterBar.innerHTML = "";
                 return;
             }
-            const filtered = data.filter(t => PREUNI_CURSOS.includes(t.curso));
-            const cursos = new Set(["Todos"]);
-            filtered.forEach(t => { if (t.curso) cursos.add(t.curso); });
+            const values = new Set(["Todos"]);
+            items.forEach(i => { if (i[filterKey]) values.add(i[filterKey]); });
             filterBar.innerHTML = "";
-            cursos.forEach(c => {
+            values.forEach(v => {
                 const btn = document.createElement("button");
-                btn.className = "filter-btn" + (c === "Todos" ? " active" : "");
-                btn.textContent = c;
+                btn.className = "filter-btn" + (v === "Todos" ? " active" : "");
+                btn.textContent = v;
                 btn.onclick = () => {
-                    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+                    filterBar.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
-                    renderTemarios(c === "Todos" ? filtered : filtered.filter(t => t.curso === c));
+                    list.innerHTML = "";
+                    (v === "Todos" ? items : items.filter(i => i[filterKey] === v)).forEach(renderFn);
                 };
                 filterBar.appendChild(btn);
             });
-            renderTemarios(filtered);
-        }
-        function renderTemarios(temarios) {
-            const list = document.getElementById("temarios-list");
             list.innerHTML = "";
-            temarios.forEach(item => {
-                const card = document.createElement("div");
-                card.className = "content-card";
-                card.innerHTML = `<h3>${item.titulo}</h3><span class="badge-tag">${item.curso || ""}</span><span class="toggle-btn" onclick="this.parentElement.classList.toggle('expanded')">Ver contenido ▼</span><div class="contenido">${item.contenido || ""}</div>`;
-                list.appendChild(card);
-            });
+            items.forEach(renderFn);
         }
-        loadTemarios();
+
+        function renderTemario(item) {
+            const list = document.getElementById("temarios-list");
+            const card = document.createElement("div");
+            card.className = "content-card";
+            card.innerHTML = `
+                <h3>${item.titulo}</h3>
+                <span class="badge-tag">${item.curso || ""}</span>
+                <span class="badge-tag green">${item.universidad || "UNI"}</span>
+                <span class="toggle-btn" onclick="this.parentElement.classList.toggle('expanded')">Ver contenido ▼</span>
+                <div class="contenido">${item.contenido || ""}</div>`;
+            list.appendChild(card);
+        }
+
+        function renderExamen(item) {
+            const list = document.getElementById("examenes-list");
+            const archivos = item.archivos || [];
+            let filesHtml = "";
+            if (archivos.length) {
+                filesHtml = '<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">';
+                archivos.forEach(f => {
+                    const isImg = /\.(jpg|jpeg|png|webp)$/i.test(f.name || f.url);
+                    filesHtml += `<a href="${f.url}" target="_blank" class="download-link">${isImg ? "🖼️" : "📄"} ${f.name} ⬇</a>`;
+                });
+                filesHtml += "</div>";
+            }
+            const card = document.createElement("div");
+            card.className = "content-card";
+            card.innerHTML = `
+                <h3>${item.titulo}</h3>
+                <span class="badge-tag">${item.materia || ""}</span>
+                <span class="badge-tag green">${item.universidad || "UNI"}</span>
+                <span class="badge-tag">${item.year || ""}</span>
+                <p style="color: #888; font-size: 0.9rem; margin-top: 0.3rem;">${item.descripcion || ""}</p>
+                ${filesHtml}`;
+            list.appendChild(card);
+        }
+
+        function renderMaterial(item) {
+            const list = document.getElementById("materiales-list");
+            const archivos = item.archivos || [];
+            let filesHtml = "";
+            if (archivos.length) {
+                filesHtml = '<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">';
+                archivos.forEach(f => {
+                    const isImg = /\.(jpg|jpeg|png|webp)$/i.test(f.name || f.url);
+                    filesHtml += `<a href="${f.url}" target="_blank" class="download-link">${isImg ? "🖼️" : "📄"} ${f.name} ⬇</a>`;
+                });
+                filesHtml += "</div>";
+            }
+            const card = document.createElement("div");
+            card.className = "content-card";
+            card.innerHTML = `
+                <h3>${item.titulo}</h3>
+                <span class="badge-tag">${item.materia || ""}</span>
+                <span class="badge-tag green">${item.universidad || "UNI"}</span>
+                <p style="color: #888; font-size: 0.9rem; margin-top: 0.3rem;">${item.descripcion || ""}</p>
+                ${filesHtml}`;
+            list.appendChild(card);
+        }
+
+        loadData();
     </script>
     <script src="/js/chat.js"></script>
 </body>
