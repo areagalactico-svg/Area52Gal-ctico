@@ -55,6 +55,22 @@
       return match ? match[1] : null;
     }
 
+    function extractTiktokId(url) {
+      const match = url?.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
+      return match ? match[1] : null;
+    }
+
+    function getVideoEmbed(url) {
+      const ytId = extractYoutubeId(url);
+      if (ytId) return { type: "youtube", embed: `https://www.youtube.com/embed/${ytId}` };
+
+      const ttId = extractTiktokId(url);
+      if (ttId) return { type: "tiktok", id: ttId };
+
+      if (url) return { type: "link", url: url };
+      return null;
+    }
+
     async function loadVideos() {
       const { data } = await supabase
         .from("videos")
@@ -94,11 +110,37 @@
       const grid = document.getElementById("videos-grid");
       grid.innerHTML = "";
       videos.forEach(v => {
-        const ytId = extractYoutubeId(v.url_youtube);
+        const video = getVideoEmbed(v.url_youtube);
+        let mediaHtml = "";
+
+        if (video?.type === "youtube") {
+          mediaHtml = `<iframe src="${video.embed}" allowfullscreen></iframe>`;
+        } else if (video?.type === "tiktok") {
+          mediaHtml = `
+            <a href="${v.url_youtube}" target="_blank" style="display: block; text-decoration: none;">
+              <div style="height: 200px; background: linear-gradient(135deg, #010101, #1a1a2e); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 0.5rem; transition: all 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                <div style="font-size: 3rem;">🎵</div>
+                <div style="font-weight: 600;">Ver en TikTok</div>
+                <div style="font-size: 0.8rem; opacity: 0.7;">Toca para abrir</div>
+              </div>
+            </a>`;
+        } else if (video?.type === "link") {
+          mediaHtml = `
+            <a href="${video.url}" target="_blank" style="display: block; text-decoration: none;">
+              <div style="height: 200px; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #333; gap: 0.5rem;">
+                <div style="font-size: 3rem;">▶️</div>
+                <div style="font-weight: 600;">Ver video</div>
+                <div style="font-size: 0.8rem; color: #888;">Toca para abrir enlace</div>
+              </div>
+            </a>`;
+        } else {
+          mediaHtml = '<div style="height: 200px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888;">Video no disponible</div>';
+        }
+
         const card = document.createElement("div");
         card.className = "video-card";
         card.innerHTML = `
-          ${ytId ? `<iframe src="https://www.youtube.com/embed/${ytId}" allowfullscreen></iframe>` : '<div style="height: 200px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888;">Video no disponible</div>'}
+          ${mediaHtml}
           <div class="video-info">
             <h3>${v.titulo}</h3>
             <p>${v.descripcion || ""}</p>
