@@ -39,7 +39,7 @@
 
   <section class="hero-mini">
     <h1>Simulacro IEN</h1>
-    <p>Practica con exámenes simulacro de ingreso a la universidad</p>
+    <p>Examen de Ingreso Escolar Nacional - Practica con el formato real del examen de la UNI</p>
   </section>
 
   <div class="container">
@@ -47,24 +47,21 @@
 
     <div id="ai-generate-section" style="max-width: 800px; margin: 2rem auto; display: none;">
       <div class="card" style="border-left: 4px solid #00c896;">
-        <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Simulacro con IA</h3>
-        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">No hay simulacros guardados. Genera preguntas personalizadas por tema:</p>
+        <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Simulacro IEN con IA</h3>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Genera preguntas del examen de ingreso a la UNI por área o examen completo:</p>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
           <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="Cálculo I">Cálculo I</option>
-            <option value="Cálculo II">Cálculo II</option>
-            <option value="Cálculo III">Cálculo III</option>
-            <option value="Álgebra Lineal">Álgebra Lineal</option>
-            <option value="Física I">Física I</option>
-            <option value="Física II">Física II</option>
-            <option value="Química">Química</option>
-            <option value="Matemática Básica">Matemática Básica</option>
+            <option value="Examen Completo IEN">Examen Completo IEN (Todas las áreas)</option>
+            <option value="Matemática">Matemática (Álgebra, Geometría, Trigonometría, Aritmética)</option>
+            <option value="Física">Física (Mecánica, Electricidad, Magnetismo, Óptica)</option>
+            <option value="Química">Química (General, Orgánica, Inorgánica)</option>
+            <option value="Razonamiento Verbal">Razonamiento Verbal</option>
+            <option value="Razonamiento Matemático">Razonamiento Matemático</option>
           </select>
           <select id="ai-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
             <option value="5">5 preguntas</option>
             <option value="10" selected>10 preguntas</option>
             <option value="15">15 preguntas</option>
-            <option value="20">20 preguntas</option>
           </select>
           <button class="btn btn-primary" id="btn-generate" onclick="generateAISimulacro()" style="white-space: nowrap;">
             Generar
@@ -84,10 +81,22 @@
     let timeLeft = 0;
 
     async function fetchMaterialsContext(materia) {
+      const materiaMap = {
+        'Matemática': 'Matemática',
+        'Física': 'Física',
+        'Química': 'Química',
+        'Razonamiento Verbal': 'Razonamiento Verbal',
+        'Razonamiento Matemático': 'Razonamiento Matemático',
+        'Examen Completo IEN': null
+      };
+      
+      const materiaName = materiaMap[materia];
+      if (!materiaName) return '';
+      
       const { data } = await supabase
         .from("materiales_referencia")
         .select("titulo, descripcion")
-        .eq("materia", materia);
+        .eq("materia", materiaName);
       if (!data || data.length === 0) return "";
       return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
     }
@@ -217,8 +226,10 @@
 
       html += `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
       currentTest.preguntas.forEach((q, qi) => {
+        const areaTag = q.area ? `<span style="display: inline-block; background: #00c896; color: white; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.5rem;">${q.area}</span>` : '';
         html += `
           <div class="question-card">
+            ${areaTag}
             <h3>${qi + 1}. ${q.texto}</h3>
             ${q.opciones.map((o, oi) => `
               <label class="option-label">
@@ -246,8 +257,17 @@
 
       const total = currentTest.preguntas.length;
       let correct = 0;
+      const areaResults = {};
+      
       currentTest.preguntas.forEach((q, qi) => {
-        if (window.answers[qi] === q.respuestaCorrecta) correct++;
+        if (window.answers[qi] === q.respuestaCorrecta) {
+          correct++;
+        }
+        if (q.area) {
+          if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, total: 0 };
+          areaResults[q.area].total++;
+          if (window.answers[qi] === q.respuestaCorrecta) areaResults[q.area].correct++;
+        }
       });
 
       const pct = Math.round((correct / total) * 100);
@@ -261,11 +281,32 @@
       else if (pct >= 40) msg = "Resultado regular. Te recomendamos reforzar estas áreas.";
       else msg = "Necesitas estudiar más. No te rindas, ¡tú puedes!";
 
+      let areaBreakdown = '';
+      if (Object.keys(areaResults).length > 1) {
+        areaBreakdown = '<div style="margin: 1.5rem 0; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;"><h3 style="margin-bottom: 1rem; color: #1a1a2e;">Resultados por área:</h3>';
+        for (const [area, data] of Object.entries(areaResults)) {
+          const areaPct = Math.round((data.correct / data.total) * 100);
+          areaBreakdown += `
+            <div style="margin-bottom: 0.8rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <span style="font-weight: bold; color: #333;">${area}</span>
+                <span style="color: #00c896;">${data.correct}/${data.total} (${areaPct}%)</span>
+              </div>
+              <div style="height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${areaPct}%; background: ${areaPct >= 70 ? '#00c896' : areaPct >= 50 ? '#f39c12' : '#e74c3c'}; border-radius: 3px;"></div>
+              </div>
+            </div>
+          `;
+        }
+        areaBreakdown += '</div>';
+      }
+
       area.innerHTML = `
         <div class="result-card">
           <h2 style="color: #00c896; font-size: 3rem;">${correct}/${total}</h2>
           <p style="font-size: 1.5rem; color: #333;">${pct}% de aciertos</p>
           <p style="color: #888; margin: 0.5rem 0;">Tiempo usado: ${elapsedMin} minutos</p>
+          ${areaBreakdown}
           <p style="font-size: 1.1rem; color: #666; margin: 1.5rem 0;">${msg}</p>
           <button class="btn" onclick="location.reload()">Volver a elegir simulacro</button>
         </div>
@@ -274,7 +315,8 @@
 
     window.generateAISimulacro = async function() {
       const topic = document.getElementById('ai-topic').value;
-      const count = parseInt(document.getElementById('ai-count').value);
+      let count = parseInt(document.getElementById('ai-count').value);
+      if (topic === 'Examen Completo IEN') count = 30;
       const btn = document.getElementById('btn-generate');
       const status = document.getElementById('ai-status');
 
@@ -299,9 +341,11 @@
 
         if (res.ok && data.preguntas && data.preguntas.length > 0) {
           const simulacroData = {
-            titulo: `Simulacro IA: ${topic}`,
-            descripcion: `Preguntas generadas por inteligencia artificial`,
-            duracion: Math.max(15, count * 2),
+            titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN' : `Simulacro IEN: ${topic}`,
+            descripcion: topic === 'Examen Completo IEN' 
+              ? 'Examen completo con 30 preguntas distribuidas en todas las áreas del IEN'
+              : `Preguntas generadas por inteligencia artificial - Área: ${topic}`,
+            duracion: 60,
             preguntas: data.preguntas
           };
           startSimulacro(simulacroData);

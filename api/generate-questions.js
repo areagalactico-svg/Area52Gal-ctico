@@ -32,31 +32,43 @@ module.exports = async function handler(req, res) {
   let systemPrompt = '';
 
   if (type === 'simulacro') {
-    systemPrompt = `Eres un generador de preguntas de examen para el examen de ingreso a la UNI (Universidad Nacional de Ingeniería) de Perú.
-${contextSection}
+    const topicDescription = topic === 'Examen Completo IEN' 
+      ? 'Genera un examen completo del IEN con preguntas distribuidas así: Matemática (6 preguntas), Física (5 preguntas), Química (5 preguntas), Razonamiento Verbal (7 preguntas), Razonamiento Matemático (7 preguntas). Total: 30 preguntas.'
+      : `Genera exactamente ${numQuestions} preguntas de opción múltiple sobre el área: ${topic}`;
 
-Genera exactamente ${numQuestions} preguntas de opción múltiple sobre: ${topic}
+    systemPrompt = `Eres un generador de preguntas para el Examen de Ingreso Escolar Nacional (IEN) de la Universidad Nacional de Ingeniería (UNI) de Perú.
 
-Formato de respuesta JSON válido (sin markdown, sin backticks):
+El examen IEN consta de las siguientes áreas:
+1. MATEMÁTICA: Aritmética, Álgebra, Geometría, Trigonometría, Estadística
+2. FÍSICA: Mecánica, Electricidad, Magnetismo, Óptica, Ondas
+3. QUÍMICA: Química General, Química Orgánica, Química Inorgánica, Estequiometría
+4. RAZONAMIENTO VERBAL: Comprensión lectora, Analogías verbales, Ortografía
+5. RAZONAMIENTO MATEMÁTICO: Secuencias numéricas, Problemas lógicos, Razonamiento abstracto
+
+${topicDescription}
+
+FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 {
   "preguntas": [
     {
       "texto": "Texto de la pregunta",
       "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"],
       "respuestaCorrecta": 0,
+      "area": "Matemática",
       "explicacion": "Breve explicación de la respuesta correcta"
     }
   ]
 }
 
-Reglas:
-- Las preguntas deben ser de nivel universitario/ingreso
+REGLAS:
+- Las preguntas deben ser de nivel ingreso universitario (16-18 años)
 - Cada pregunta tiene exactamente 4 opciones
 - respuestaCorrecta es el índice (0-3) de la opción correcta
+- El campo "area" indica a qué área del examen IEN pertenece
 - Incluye una explicación breve para cada respuesta
-- Varía la dificultad: algunas fáciles, algunas difíciles
+- Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
 - No repitas conceptos entre preguntas
-- Si hay contexto de referencia, genera preguntas de estilo y dificultad similares`;
+- Usa el contexto de referencia si está disponible para guiar la dificultad`;
   } else {
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
 
@@ -105,7 +117,9 @@ REGLAS:
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Genera ${numQuestions} preguntas de ${type} sobre: ${topic}` }
+          { role: 'user', content: topic === 'Examen Completo IEN' 
+            ? `Genera un examen completo del IEN con 30 preguntas distribuidas: 6 Matemática, 5 Física, 5 Química, 7 Razonamiento Verbal, 7 Razonamiento Matemático. ${context ? 'Usa el contexto de referencia para guiar la dificultad.' : ''}`
+            : `Genera ${numQuestions} preguntas del área "${topic}" para el examen IEN de la UNI. ${context ? 'Usa el contexto de referencia para guiar la dificultad.' : ''}` }
         ],
         max_tokens: 4096,
         temperature: 0.8
