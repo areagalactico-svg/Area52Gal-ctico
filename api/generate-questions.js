@@ -58,30 +58,40 @@ Reglas:
 - No repitas conceptos entre preguntas
 - Si hay contexto de referencia, genera preguntas de estilo y dificultad similares`;
   } else {
-    systemPrompt = `Eres un generador de preguntas de test vocacional para estudiantes que quieren ingresar a la UNI.
-${contextSection}
+    systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
+
+FRAMEWORKS A USAR:
+1. HOLLAND RIASEC: Realista (R), Investigativo (I), Artístico (A), Social (S), Emprendedor (E), Convencional (C)
+2. BIG FIVE (OCEAN): Apertura (O), Responsabilidad (C), Extraversión (E), Amabilidad (A), Neuroticismo (N)
+3. MÚLTIPLES INTELIGENCIAS DE GARDNER: Lingüística, Lógico-matemática, Espacial, Musical, Corporal-kinestésica, Interpersonal, Intrapersonal, Naturalista
+4. APTITUDES COGNITIVAS: Razonamiento verbal, numérico, espacial, abstracto
+5. VALORES PROFESIONALES (SCHWARTZ): Autonomía, logro, poder, benevolencia, universalismo, seguridad, tradición, estimación
 
 Genera exactamente ${numQuestions} preguntas de opción múltiple sobre: ${topic}
 
-Formato de respuesta JSON válido (sin markdown, sin backticks):
+FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 {
   "preguntas": [
     {
-      "texto": "Texto de la pregunta",
-      "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"],
+      "texto": "¿Qué actividad disfrutas más en tu tiempo libre?",
+      "opciones": ["Resolver problemas lógicos o acertijos", "Crear arte, música o escribir", "Ayudar a otros y trabajar en equipo", "Organizar eventos o liderar grupos"],
       "respuestaCorrecta": 0,
-      "area": "nombre del área que evalúa"
+      "area": "Holland RIASEC",
+      "dimension": "Investigativo vs Artístico vs Social vs Emprendedor"
     }
   ]
 }
 
-Reglas:
-- Las preguntas deben evaluar habilidades, intereses o conocimientos relevantes para carreras de ingeniería
-- Cada pregunta tiene exactamente 4 opciones
-- respuestaCorrecta es el índice (0-3) de la opción que mejor representa el perfil
-- Incluye un campo "area" que indique qué habilidad o área se evalúa
-- Las preguntas deben ser claras y no ambiguas
-- Varía los tipos: preferencias, situaciones, habilidades, valores`;
+REGLAS:
+- Cada pregunta evalúa un framework psicométrico conocido
+- El campo "area" indica qué framework evalúa (Holland, Big Five, Gardner, Aptitudes, Valores)
+- El campo "dimension" indica las dimensiones específicas que contrasta
+- Las opciones deben ser conductas observables, no opiniones
+- NO hay respuestas "correctas" o "incorrectas" — cada opción revela un perfil
+- Incluye preguntas situacionales (¿qué harías en esta situación?)
+- Incluye preguntas de preferencia (¿qué prefieres hacer?)
+- Incluye preguntas de autoevaluación (¿qué tan hábil te consideras?)
+- Varía los frameworks para cubrir múltiples dimensiones de la personalidad`;
   }
 
   try {

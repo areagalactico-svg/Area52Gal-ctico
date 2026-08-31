@@ -17,10 +17,21 @@
     .option-label:hover { border-color: #00c896; background: #f0faf7; }
     .option-label input:checked + span { font-weight: bold; color: #00c896; }
     .option-label:has(input:checked) { border-color: #00c896; background: #f0faf7; }
-    .result-card { background: white; border-radius: 12px; padding: 3rem; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-    .result-card h2 { color: #00c896; font-size: 2.5rem; margin-bottom: 1rem; }
     .progress-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 2rem; }
     .progress-bar-fill { height: 100%; background: #00c896; transition: width 0.3s; }
+    .result-section { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+    .result-section h3 { color: #1a1a2e; margin-bottom: 1rem; border-bottom: 2px solid #00c896; padding-bottom: 0.5rem; }
+    .profile-bar { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.6rem; }
+    .profile-bar .label { min-width: 140px; font-weight: 600; color: #333; font-size: 0.9rem; }
+    .profile-bar .bar-bg { flex: 1; height: 24px; background: #e0e0e0; border-radius: 12px; overflow: hidden; position: relative; }
+    .profile-bar .bar-fill { height: 100%; border-radius: 12px; transition: width 0.8s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 0.75rem; color: white; font-weight: bold; }
+    .career-card { background: linear-gradient(135deg, #f0faf7, #e8f8f0); border: 2px solid #00c896; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .career-card h4 { color: #00c896; font-size: 1.2rem; margin-bottom: 0.3rem; }
+    .career-card p { color: #666; font-size: 0.9rem; }
+    .uni-card { background: white; border: 2px solid #e0e0e0; border-radius: 10px; padding: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 1rem; }
+    .uni-card .uni-name { font-weight: 700; color: #1a1a2e; }
+    .uni-card .uni-type { font-size: 0.8rem; color: #888; }
+    .badge-tag { display: inline-block; background: #f0faf7; color: #00c896; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-right: 0.5rem; }
   </style>
 </head>
 <body>
@@ -39,7 +50,7 @@
 
   <section class="hero-mini">
     <h1>Test Vocacional</h1>
-    <p>Descubre qué carrera se adapta a tus habilidades e intereses</p>
+    <p>Basado en evaluaciones psicométricas internacionales: Holland RIASEC, Big Five, Múltiples Inteligencias</p>
   </section>
 
   <div class="container" id="main-container">
@@ -48,49 +59,150 @@
     <div id="ai-generate-section" style="max-width: 800px; margin: 2rem auto; display: none;">
       <div class="card" style="border-left: 4px solid #00c896;">
         <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Test Vocacional con IA</h3>
-        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">No hay tests guardados. Genera un test personalizado por área:</p>
+        <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Genera un test basado en criterios psicométricos internacionales:</p>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
           <select id="ai-voc-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="Preferencias académicas e intereses">Preferencias académicas e intereses</option>
-            <option value="Habilidades lógicas y matemáticas">Habilidades lógicas y matemáticas</option>
-            <option value="Perfil personal para ingeniería">Perfil personal para ingeniería</option>
-            <option value="Intereses profesionales en ingeniería">Intereses profesionales en ingeniería</option>
-            <option value="Valores y metas profesionales">Valores y metas profesionales</option>
+            <option value="Test completo: Holland RIASEC + Big Five + Múltiples Inteligencias">Test Completo (Todos los criterios)</option>
+            <option value="Holland RIASEC - Tipos de personalidad vocacional">Holland RIASEC (6 tipos vocacionales)</option>
+            <option value="Big Five - Cinco grandes rasgos de personalidad">Big Five / OCEAN (Personalidad)</option>
+            <option value="Múltiples Inteligencias de Gardner">Múltiples Inteligencias (Gardner)</option>
+            <option value="Aptitudes cognitivas y habilidades lógicas">Aptitudes Cognitivas</option>
+            <option value="Valores personales y profesionales (Schwartz)">Valores Profesionales</option>
           </select>
           <select id="ai-voc-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="5">5 preguntas</option>
-            <option value="10" selected>10 preguntas</option>
-            <option value="15">15 preguntas</option>
+            <option value="10">10 preguntas</option>
+            <option value="15" selected>15 preguntas</option>
+            <option value="20">20 preguntas</option>
           </select>
-          <button class="btn btn-primary" id="btn-generate-voc" onclick="generateAITest()" style="white-space: nowrap;">
-            Generar
-          </button>
+          <button class="btn btn-primary" id="btn-generate-voc" onclick="generateAITest()" style="white-space: nowrap;">Generar</button>
         </div>
         <div id="ai-voc-status" style="display: none; color: #00c896; font-size: 0.9rem;"></div>
       </div>
     </div>
 
     <div id="test-area" style="display: none; max-width: 800px; margin: 2rem auto;"></div>
+    <div id="result-area" style="display: none; max-width: 800px; margin: 2rem auto;"></div>
   </div>
 
   <script type="module">
     import { supabase } from "/js/supabase-config.js";
 
-    async function fetchMaterialsContext(materia) {
-      const { data } = await supabase
-        .from("materiales_referencia")
-        .select("titulo, descripcion")
-        .eq("materia", materia);
-      if (!data || data.length === 0) return "";
-      return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
-    }
+    const UNIVERSIDADES_PERU = {
+      "Ingeniería Civil": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UNALM - Universidad Nacional Agraria La Molina", tipo: "Pública" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" }
+      ],
+      "Ingeniería de Sistemas": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "USP - Universidad de San Martín de Porres", tipo: "Privada" },
+        { nombre: "UDEP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" }
+      ],
+      "Ingeniería Mecánica": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNALM - Universidad Nacional Agraria La Molina", tipo: "Pública" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Ingeniería Eléctrica": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" }
+      ],
+      "Ingeniería Industrial": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" },
+        { nombre: "ULima - Universidad de Lima", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Medicina": [
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UANCV - Universidad Alas Peruanas", tipo: "Privada" }
+      ],
+      "Derecho": [
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Economía": [
+        { nombre: "UP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" }
+      ],
+      "Administración": [
+        { nombre: "UP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "ULima - Universidad de Lima", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Arquitectura": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Contabilidad": [
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" },
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" }
+      ],
+      "Psicología": [
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" },
+        { nombre: "UCA - Universidad Católica de Arica", tipo: "Privada" }
+      ],
+      "Comunicaciones": [
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UP - Universidad del Pacífico", tipo: "Privada" },
+        { nombre: "ULima - Universidad de Lima", tipo: "Privada" },
+        { nombre: "USMP - Universidad San Martín de Porres", tipo: "Privada" }
+      ],
+      "Ciencias de la Computación": [
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "UPC - Universidad Peruana de Ciencias Aplicadas", tipo: "Privada" }
+      ],
+      "Biología / Ciencias Naturales": [
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNALM - Universidad Nacional Agraria La Molina", tipo: "Pública" }
+      ],
+      "Educación": [
+        { nombre: "UNMSM - Universidad Nacional Mayor de San Marcos", tipo: "Pública" },
+        { nombre: "PUCP - Pontificia Universidad Católica del Perú", tipo: "Privada" },
+        { nombre: "UNI - Universidad Nacional de Ingeniería", tipo: "Pública" }
+      ]
+    };
+
+    const CARRERAS_POR_PERFIL = {
+      "Realista": ["Ingeniería Civil", "Ingeniería Mecánica", "Ingeniería Eléctrica", "Arquitectura"],
+      "Investigativo": ["Ingeniería de Sistemas", "Ciencias de la Computación", "Biología / Ciencias Naturales", "Medicina"],
+      "Artístico": ["Arquitectura", "Comunicaciones", "Diseño Gráfico"],
+      "Social": ["Educación", "Psicología", "Medicina", "Trabajo Social"],
+      "Emprendedor": ["Administración", "Economía", "Derecho", "Ingeniería Industrial"],
+      "Convencional": ["Contabilidad", "Administración", "Economía", "Ingeniería Industrial"]
+    };
+
+    let currentTest = null;
+    let answers = {};
+    let currentAIQuestions = [];
 
     async function loadTests() {
-      const { data } = await supabase
-        .from("test_vocacionales")
-        .select("*")
-        .order("fecha", { ascending: false });
-
+      const { data } = await supabase.from("test_vocacionales").select("*").order("fecha", { ascending: false });
       const list = document.getElementById("tests-list");
 
       if (!data || data.length === 0) {
@@ -102,12 +214,8 @@
           if (numPreguntas === 0) return;
           const card = document.createElement("div");
           card.className = "test-card";
-          card.innerHTML = `
-            <h3>${item.titulo}</h3>
-            <p style="color: #666; margin: 0.5rem 0;">${item.descripcion || ""}</p>
-            <p style="color: #00c896; font-weight: bold;">${numPreguntas} preguntas</p>
-          `;
-          card.onclick = () => startTest(item.id, item);
+          card.innerHTML = `<h3>${item.titulo}</h3><p style="color: #666; margin: 0.5rem 0;">${item.descripcion || ""}</p><p style="color: #00c896; font-weight: bold;">${numPreguntas} preguntas</p>`;
+          card.onclick = () => startTest(item.preguntas, item.titulo);
           list.appendChild(card);
         });
         if (list.children.length === 0) {
@@ -117,18 +225,19 @@
       document.getElementById('ai-generate-section').style.display = 'block';
     }
 
-    let currentTest = null;
-    let answers = {};
-
-    window.startTest = function(id, data) {
-      currentTest = data;
+    window.startTest = function(preguntas, titulo) {
+      currentTest = { preguntas, titulo };
       answers = {};
+      currentAIQuestions = preguntas;
       document.getElementById("tests-list").style.display = "none";
+      document.getElementById("ai-generate-section").style.display = "none";
+      document.getElementById("result-area").style.display = "none";
       const area = document.getElementById("test-area");
       area.style.display = "block";
 
-      let html = `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
-      data.preguntas.forEach((q, qi) => {
+      let html = `<h2 style="margin-bottom: 1.5rem; color: #1a1a2e;">${titulo}</h2>`;
+      html += `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
+      preguntas.forEach((q, qi) => {
         html += `
           <div class="question-card">
             <h3>${qi + 1}. ${q.texto}</h3>
@@ -141,7 +250,7 @@
           </div>
         `;
       });
-      html += `<button class="btn btn-primary" onclick="submitTest()" style="width: 100%; padding: 1rem;">Finalizar Test</button>`;
+      html += `<button class="btn btn-primary" onclick="submitTest()" style="width: 100%; padding: 1rem; font-size: 1.1rem;">Ver mi Diagnóstico Vocacional</button>`;
       area.innerHTML = html;
       window.answers = answers;
     };
@@ -149,38 +258,136 @@
     window.updateProgress = function() {
       const total = currentTest.preguntas.length;
       const answered = Object.keys(window.answers).length;
-      const pct = (answered / total) * 100;
-      document.querySelector(".progress-bar-fill").style.width = pct + "%";
+      document.querySelector(".progress-bar-fill").style.width = ((answered / total) * 100) + "%";
     };
 
     window.submitTest = function() {
       const total = currentTest.preguntas.length;
       const answered = Object.keys(window.answers).length;
       if (answered < total) {
-        if (!confirm(`Solo respondiste ${answered} de ${total} preguntas. ¿Deseas finalizar?`)) return;
+        if (!confirm(`Solo respondiste ${answered} de ${total} preguntas. ¿Deseas ver tu diagnóstico?`)) return;
       }
 
-      let correct = 0;
-      currentTest.preguntas.forEach((q, qi) => {
-        if (window.answers[qi] === q.respuestaCorrecta) correct++;
+      const perfil = { Realista: 0, Investigativo: 0, Artístico: 0, Social: 0, Emprendedor: 0, Convencional: 0 };
+      const bigFive = { Apertura: 0, Responsabilidad: 0, Extraversión: 0, Amabilidad: 0, Neuroticismo: 0 };
+      const inteligencias = { Lingüística: 0, "Lógico-matemática": 0, Espacial: 0, Musical: 0, "Corporal-kinestésica": 0, Interpersonal: 0, Intrapersonal: 0, Naturalista: 0 };
+      const areasCount = {};
+
+      currentAIQuestions.forEach((q, qi) => {
+        const ans = window.answers[qi];
+        if (ans === undefined) return;
+
+        const area = q.area || "";
+        const text = (q.texto + " " + q.opciones[ans]).toLowerCase();
+
+        if (area.includes("Holland") || area.includes("RIASEC")) {
+          if (text.match(/realiz|construir|mecánic|taller|objetos|armar/)) perfil["Realista"]++;
+          else if (text.match(/investig|analizar|ciencia|experiment|descubrir/)) perfil["Investigativo"]++;
+          else if (text.match(/crear|arte|música|diseñ|escrit|imagin/)) perfil["Artístico"]++;
+          else if (text.match(/ayud|enseñ|social|personas|comunidad|servir/)) perfil["Social"]++;
+          else if (text.match(/lider|negoci|emprend|vender|convencer|empresa/)) perfil["Emprendedor"]++;
+          else if (text.match(/organiz|datos|contab|orden|sistema|detall/)) perfil["Convencional"]++;
+          else perfil["Investigativo"]++;
+        } else if (area.includes("Big Five") || area.includes("OCEAN")) {
+          if (ans <= 1) { bigFive["Apertura"]++; bigFive["Responsabilidad"]++; }
+          else if (ans === 2) { bigFive["Extraversión"]++; bigFive["Amabilidad"]++; }
+          else { bigFive["Neuroticismo"]++; }
+        } else if (area.includes("Gardner") || area.includes("Inteligen")) {
+          if (text.match(/leer|escribir|hablar|palabr|lingü/)) inteligencias["Lingüística"]++;
+          else if (text.match(/número|math|cálculo|lógica|problema/)) inteligencias["Lógico-matemática"]++;
+          else if (text.match(/visual|espacial|dibuj|imagen|mapa/)) inteligencias["Espacial"]++;
+          else if (text.match(/música|ritmo|melod|sonido/)) inteligencias["Musical"]++;
+          else if (text.match(/deporte|movim|corpor|manos|cuerpo/)) inteligencias["Corporal-kinestésica"]++;
+          else if (text.match(/equipo|social|comunic|lideraz|grupo/)) inteligencias["Interpersonal"]++;
+          else if (text.match(/reflex|solo|auto|introspec|medita/)) inteligencias["Intrapersonal"]++;
+          else if (text.match(/naturaleza|animal|plant|ecolog|ambiente/)) inteligencias["Naturalista"]++;
+          else inteligencias["Lógico-matemática"]++;
+        } else {
+          perfil["Investigativo"]++;
+        }
+
+        if (area) areasCount[area] = (areasCount[area] || 0) + 1;
       });
 
-      const pct = Math.round((correct / total) * 100);
-      const area = document.getElementById("test-area");
-      let resultMsg = "";
-      if (pct >= 80) resultMsg = "Excelente! Tienes perfil para carreras de alta exigencia.";
-      else if (pct >= 60) resultMsg = "Buen resultado. Tienes buenas bases para varias carreras.";
-      else if (pct >= 40) resultMsg = "Resultado regular. Considera reforzar algunas áreas.";
-      else resultMsg = "Necesitas reforzar tus conocimientos. No te desanimes!";
+      const perfilSorted = Object.entries(perfil).sort((a, b) => b[1] - a[1]);
+      const topPerfil = perfilSorted[0][0];
+      const segundaPerfil = perfilSorted[1][0];
 
-      area.innerHTML = `
-        <div class="result-card">
-          <h2>${correct}/${total}</h2>
-          <p style="font-size: 1.3rem; color: #333; margin-bottom: 1rem;">${pct}% de aciertos</p>
-          <p style="font-size: 1.1rem; color: #666; margin-bottom: 2rem;">${resultMsg}</p>
-          <button class="btn" onclick="location.reload()">Volver a elegir test</button>
+      const carrerasRecomendadas = CARRERAS_POR_PERFIL[topPerfil] || CARRERAS_POR_PERFIL["Investigativo"];
+      const carrerasSecundarias = CARRERAS_POR_PERFIL[segundaPerfil] || [];
+      const todasCarreras = [...new Set([...carrerasRecomendadas, ...carrerasSecundarias])];
+
+      const maxPerfil = Math.max(...Object.values(perfil)) || 1;
+
+      const resultArea = document.getElementById("result-area");
+      document.getElementById("test-area").style.display = "none";
+      resultArea.style.display = "block";
+
+      let html = `
+        <div class="result-section" style="text-align: center; background: linear-gradient(135deg, #0f3460, #1a1a2e); color: white;">
+          <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">Tu Diagnóstico Vocacional</h2>
+          <p style="font-size: 1.1rem; opacity: 0.9;">Basado en Holland RIASEC, Big Five y Múltiples Inteligencias</p>
+        </div>
+
+        <div class="result-section">
+          <h3>🎭 Perfil de Personalidad Vocacional (Holland RIASEC)</h3>
+          <p style="color: #888; font-size: 0.9rem; margin-bottom: 1rem;">Tu tipo principal: <strong style="color: #00c896; font-size: 1.2rem;">${topPerfil}</strong> + ${segundaPerfil}</p>
+          ${perfilSorted.map(([tipo, count]) => {
+            const pct = Math.round((count / maxPerfil) * 100);
+            const colors = { Realista: "#e74c3c", Investigativo: "#3498db", Artístico: "#9b59b6", Social: "#2ecc71", Emprendedor: "#f39c12", Convencional: "#1abc9c" };
+            return `<div class="profile-bar"><span class="label">${tipo}</span><div class="bar-bg"><div class="bar-fill" style="width: ${pct}%; background: ${colors[tipo]};">${count > 0 ? count : ""}</div></div></div>`;
+          }).join("")}
+        </div>
+
+        <div class="result-section">
+          <h3>🧠 Inteligencias Destacadas (Gardner)</h3>
+          ${Object.entries(inteligencias).sort((a, b) => b[1] - a[1]).filter(([, c]) => c > 0).map(([tipo, count]) => {
+            const pct = Math.round((count / (maxPerfil || 1)) * 100);
+            return `<div class="profile-bar"><span class="label">${tipo}</span><div class="bar-bg"><div class="bar-fill" style="width: ${pct}%; background: #00c896;">${count}</div></div></div>`;
+          }).join("") || '<p style="color: #888;">Completa más preguntas para ver tu perfil de inteligencias.</p>'}
+        </div>
+
+        <div class="result-section">
+          <h3>🎯 Carreras Recomendadas</h3>
+          <p style="color: #888; font-size: 0.9rem; margin-bottom: 1rem;">Basado en tu perfil "${topPerfil}" y "${segundaPerfil}"</p>
+          ${todasCarreras.slice(0, 6).map((carrera, i) => `
+            <div class="career-card">
+              <h4>${i === 0 ? "⭐ " : ""}${carrera}</h4>
+              <p>${i === 0 ? "Carrera que mejor se adapta a tu perfil" : "Carrera compatible con tus habilidades"}</p>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="result-section">
+          <h3>🏛️ Universidades Recomendadas en Perú</h3>
+          <p style="color: #888; font-size: 0.9rem; margin-bottom: 1rem;">Universidades con mejor programa en ${todasCarreras[0]}</p>
+          ${(UNIVERSIDADES_PERU[todasCarreras[0]] || UNIVERSIDADES_PERU["Ingeniería de Sistemas"]).map(uni => `
+            <div class="uni-card">
+              <div>
+                <div class="uni-name">${uni.nombre}</div>
+                <div class="uni-type">${uni.tipo === "Pública" ? "🌐 Pública" : "🔒 Privada"} • Lima, Perú</div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="result-section" style="background: #f0faf7; border: 2px solid #00c896;">
+          <h3>📋 Resumen de tu Perfil</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div><strong>Tipo principal:</strong> ${topPerfil}</div>
+            <div><strong>Tipo secundario:</strong> ${segundaPerfil}</div>
+            <div><strong>Carrera top:</strong> ${todasCarreras[0]}</div>
+            <div><strong>Preguntas respondidas:</strong> ${answered} de ${total}</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 2rem;">
+          <button class="btn btn-primary" onclick="location.reload()" style="padding: 1rem 2rem; font-size: 1.1rem;">Realizar otro test</button>
+          <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20hice%20el%20test%20vocacional%20y%20me%20recomendaron%20${encodeURIComponent(todasCarreras[0])}" class="btn" style="padding: 1rem 2rem; font-size: 1.1rem; text-decoration: none;">💬 Consultar sobre ${todasCarreras[0]}</a>
         </div>
       `;
+
+      resultArea.innerHTML = html;
     };
 
     window.generateAITest = async function() {
@@ -193,28 +400,19 @@
       btn.textContent = 'Generando...';
       status.style.display = 'block';
       status.style.color = '#00c896';
-      status.textContent = 'Buscando materiales de referencia...';
-
-      const context = await fetchMaterialsContext(topic);
-
-      status.textContent = 'La IA está creando tu test vocacional...';
+      status.textContent = 'La IA está creando tu test vocacional con criterios psicométricos...';
 
       try {
         const res = await fetch('/api/generate-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic, type: 'vocacional', count, context })
+          body: JSON.stringify({ topic, type: 'vocacional', count })
         });
 
         const data = await res.json();
 
         if (res.ok && data.preguntas && data.preguntas.length > 0) {
-          const testData = {
-            titulo: `Test IA: ${topic}`,
-            descripcion: 'Generado por inteligencia artificial',
-            preguntas: data.preguntas
-          };
-          startTest('ai-generated', testData);
+          startTest(data.preguntas, `Test IA: ${topic}`);
         } else {
           status.style.color = '#e74c3c';
           status.textContent = 'No se pudieron generar las preguntas. Intenta con otro tema.';
