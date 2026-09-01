@@ -51,17 +51,24 @@
         <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Genera preguntas del examen de ingreso a la UNI por área o examen completo:</p>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
           <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="Examen Completo IEN">Examen Completo IEN (Todas las áreas)</option>
-            <option value="Matemática">Matemática (Álgebra, Geometría, Trigonometría, Aritmética)</option>
-            <option value="Física">Física (Mecánica, Electricidad, Magnetismo, Óptica)</option>
+            <option value="Examen Completo IEN">Examen Completo IEN (60 preguntas - 2h 45min)</option>
+            <option value="PE1 - Aptitud Académica y Humanidades">PE1 - Aptitud Académica y Humanidades (33 preguntas)</option>
+            <option value="PE2 - Matemática">PE2 - Matemática (13 preguntas)</option>
+            <option value="PE3 - Física y Química">PE3 - Física y Química (14 preguntas)</option>
+            <option disabled style="background: #f0f0f0;">─── Subtemas ───</option>
+            <option value="Razonamiento Matemático">Razonamiento Matemático (12 preguntas)</option>
+            <option value="Razonamiento Verbal">Razonamiento Verbal (13 preguntas)</option>
+            <option value="Humanidades">Humanidades (8 preguntas)</option>
+            <option value="Matemática">Matemática (Aritmética, Álgebra, Geometría, Trigonometría)</option>
+            <option value="Física">Física (Mecánica, Electricidad, Óptica)</option>
             <option value="Química">Química (General, Orgánica, Inorgánica)</option>
-            <option value="Razonamiento Verbal">Razonamiento Verbal</option>
-            <option value="Razonamiento Matemático">Razonamiento Matemático</option>
           </select>
           <select id="ai-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-            <option value="5">5 preguntas</option>
-            <option value="10" selected>10 preguntas</option>
-            <option value="15">15 preguntas</option>
+            <option value="10">10 preguntas</option>
+            <option value="15" selected>15 preguntas</option>
+            <option value="20">20 preguntas</option>
+            <option value="30">30 preguntas</option>
+            <option value="60">60 preguntas (Examen completo)</option>
           </select>
           <button class="btn btn-primary" id="btn-generate" onclick="generateAISimulacro()" style="white-space: nowrap;">
             Generar
@@ -87,6 +94,10 @@
         'Química': 'Química',
         'Razonamiento Verbal': 'Razonamiento Verbal',
         'Razonamiento Matemático': 'Razonamiento Matemático',
+        'Humanidades': 'Humanidades',
+        'PE1 - Aptitud Académica y Humanidades': null,
+        'PE2 - Matemática': null,
+        'PE3 - Física y Química': null,
         'Examen Completo IEN': null
       };
       
@@ -226,10 +237,11 @@
 
       html += `<div class="progress-bar"><div class="progress-bar-fill" style="width: 0%"></div></div>`;
       currentTest.preguntas.forEach((q, qi) => {
-        const areaTag = q.area ? `<span style="display: inline-block; background: #00c896; color: white; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.5rem;">${q.area}</span>` : '';
+        const areaTag = q.area ? `<span style="display: inline-block; background: ${q.area === 'PE1' ? '#3498db' : q.area === 'PE2' ? '#e74c3c' : '#2ecc71'}; color: white; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.5rem;">${q.area}</span>` : '';
+        const subtemaTag = q.subtema ? `<span style="display: inline-block; background: #f0f0f0; color: #333; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; margin-left: 0.3rem; margin-bottom: 0.5rem;">${q.subtema}</span>` : '';
         html += `
           <div class="question-card">
-            ${areaTag}
+            <div>${areaTag}${subtemaTag}</div>
             <h3>${qi + 1}. ${q.texto}</h3>
             ${q.opciones.map((o, oi) => `
               <label class="option-label">
@@ -258,15 +270,22 @@
       const total = currentTest.preguntas.length;
       let correct = 0;
       const areaResults = {};
+      const subtemaResults = {};
       
       currentTest.preguntas.forEach((q, qi) => {
-        if (window.answers[qi] === q.respuestaCorrecta) {
-          correct++;
-        }
+        const isCorrect = window.answers[qi] === q.respuestaCorrecta;
+        if (isCorrect) correct++;
+        
         if (q.area) {
           if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, total: 0 };
           areaResults[q.area].total++;
-          if (window.answers[qi] === q.respuestaCorrecta) areaResults[q.area].correct++;
+          if (isCorrect) areaResults[q.area].correct++;
+        }
+        
+        if (q.subtema) {
+          if (!subtemaResults[q.subtema]) subtemaResults[q.subtema] = { correct: 0, total: 0 };
+          subtemaResults[q.subtema].total++;
+          if (isCorrect) subtemaResults[q.subtema].correct++;
         }
       });
 
@@ -283,17 +302,18 @@
 
       let areaBreakdown = '';
       if (Object.keys(areaResults).length > 1) {
-        areaBreakdown = '<div style="margin: 1.5rem 0; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;"><h3 style="margin-bottom: 1rem; color: #1a1a2e;">Resultados por área:</h3>';
-        for (const [area, data] of Object.entries(areaResults)) {
+        areaBreakdown = '<div style="margin: 1.5rem 0; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;"><h3 style="margin-bottom: 1rem; color: #1a1a2e; text-align: center;">Resultados por Prueba:</h3>';
+        const areaColors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
+        for (const [areaName, data] of Object.entries(areaResults)) {
           const areaPct = Math.round((data.correct / data.total) * 100);
           areaBreakdown += `
             <div style="margin-bottom: 0.8rem;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
-                <span style="font-weight: bold; color: #333;">${area}</span>
+                <span style="font-weight: bold; color: ${areaColors[areaName] || '#333'};">${areaName}</span>
                 <span style="color: #00c896;">${data.correct}/${data.total} (${areaPct}%)</span>
               </div>
-              <div style="height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
-                <div style="height: 100%; width: ${areaPct}%; background: ${areaPct >= 70 ? '#00c896' : areaPct >= 50 ? '#f39c12' : '#e74c3c'}; border-radius: 3px;"></div>
+              <div style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: ${areaPct}%; background: ${areaPct >= 70 ? '#00c896' : areaPct >= 50 ? '#f39c12' : '#e74c3c'}; border-radius: 4px;"></div>
               </div>
             </div>
           `;
@@ -316,7 +336,13 @@
     window.generateAISimulacro = async function() {
       const topic = document.getElementById('ai-topic').value;
       let count = parseInt(document.getElementById('ai-count').value);
-      if (topic === 'Examen Completo IEN') count = 30;
+      let duration = 60;
+      
+      if (topic === 'Examen Completo IEN') { count = 60; duration = 165; }
+      else if (topic === 'PE1 - Aptitud Académica y Humanidades') { count = 33; duration = 60; }
+      else if (topic === 'PE2 - Matemática') { count = 13; duration = 60; }
+      else if (topic === 'PE3 - Física y Química') { count = 14; duration = 105; }
+      
       const btn = document.getElementById('btn-generate');
       const status = document.getElementById('ai-status');
 
@@ -341,11 +367,11 @@
 
         if (res.ok && data.preguntas && data.preguntas.length > 0) {
           const simulacroData = {
-            titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN' : `Simulacro IEN: ${topic}`,
+            titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN (60 preguntas)' : `Simulacro IEN: ${topic}`,
             descripcion: topic === 'Examen Completo IEN' 
-              ? 'Examen completo con 30 preguntas distribuidas en todas las áreas del IEN'
-              : `Preguntas generadas por inteligencia artificial - Área: ${topic}`,
-            duracion: 60,
+              ? 'Examen completo con 60 preguntas - 2h 45min (formato oficial UNI)'
+              : `Preguntas generadas por IA - ${topic}`,
+            duracion: duration,
             preguntas: data.preguntas
           };
           startSimulacro(simulacroData);

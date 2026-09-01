@@ -32,43 +32,80 @@ module.exports = async function handler(req, res) {
   let systemPrompt = '';
 
   if (type === 'simulacro') {
-    const topicDescription = topic === 'Examen Completo IEN' 
-      ? 'Genera un examen completo del IEN con preguntas distribuidas así: Matemática (6 preguntas), Física (5 preguntas), Química (5 preguntas), Razonamiento Verbal (7 preguntas), Razonamiento Matemático (7 preguntas). Total: 30 preguntas.'
-      : `Genera exactamente ${numQuestions} preguntas de opción múltiple sobre el área: ${topic}`;
+    const topicConfigs = {
+      'Examen Completo IEN': {
+        count: 60,
+        prompt: `Genera un EXAMEN COMPLETO del IEN UNI con 60 preguntas distribuidas EXACTAMENTE así:
+- PE1 (33 preguntas): Razonamiento Matemático (12), Razonamiento Verbal (13), Humanidades (8)
+- PE2 (13 preguntas): Matemática - Aritmética (3), Álgebra (4), Geometría (3), Trigonometría (3)
+- PE3 (14 preguntas): Física (7), Química (7)
+Cada pregunta debe incluir el campo "area" indicando a qué prueba pertenece (PE1, PE2 o PE3) y el subtema específico.`
+      },
+      'PE1 - Aptitud Académica y Humanidades': {
+        count: 33,
+        prompt: `Genera la PE1 del IEN UNI - Aptitud Académica y Humanidades (33 preguntas):
+- Razonamiento Matemático (12 preguntas): Sucesiones numéricas, análisis de figuras, conteo, lógica proposicional, juegos lógicos
+- Razonamiento Verbal (13 preguntas): Comprensión lectora, analogías verbales, significado de palabras en contexto, ortografía
+- Humanidades (8 preguntas): Comunicación, Lengua, Literatura, Historia del Perú y del Mundo, Geografía, Economía, Filosofía, Lógica, Ambiente
+Cada pregunta debe incluir "area" y "subtema".`
+      },
+      'PE2 - Matemática': {
+        count: 13,
+        prompt: `Genera la PE2 del IEN UNI - Matemática (13 preguntas):
+- Aritmética (3): Divisibilidad, MCM/MCD, porcentajes, razones, proporciones, números primos
+- Álgebra (4): Ecuaciones, sistemas de ecuaciones, desigualdades, funciones, expresiones algebraicas
+- Geometría (3): Triángulos, circunferencia, áreas, perímetros, semejanza, polígonos
+- Trigonometría (3): Razones trigonométricas, identidades, ecuaciones trigonométricas, aplicación a triángulos
+Cada pregunta debe incluir "area" y "subtema".`
+      },
+      'PE3 - Física y Química': {
+        count: 14,
+        prompt: `Genera la PE3 del IEN UNI - Física y Química (14 preguntas):
+- Física (7): Cinemática, dinámica, trabajo y energía, estática, hidrostática, termodinámica, electricidad, magnetismo, ondas, óptica, física moderna
+- Química (7): Estructura atómica, tabla periódica, enlaces químicos, estequiometría, reacciones químicas, química orgánica básica
+Cada pregunta debe incluir "area" y "subtema".`
+      },
+      'Razonamiento Matemático': { count: 12, prompt: `Genera 12 preguntas de Razonamiento Matemático del IEN UNI: sucesiones numéricas, análisis de figuras (series, analogías, distribución en filas y columnas, figuras discordantes), análisis de sólidos (vistas, despliegues), conteo de figuras geométricas, conteo de rutas, conteo de cubos, lógica proposicional, inferencias, juegos lógicos.` },
+      'Razonamiento Verbal': { count: 13, prompt: `Genera 13 preguntas de Razonamiento Verbal del IEN UNI: comprensión lectora (textos argumentativos, narrativos, expositivos), analogías verbales, significado de palabras en contexto, relaciones semánticas, ortografía, reglas de acentuación.` },
+      'Humanidades': { count: 8, prompt: `Genera 8 preguntas de Humanidades del IEN UNI: Comunicación, Lengua, Literatura, Historia del Perú y del Mundo, Geografía, Economía, Filosofía, Lógica, Ambiente.` },
+      'Matemática': { count: 13, prompt: `Genera 13 preguntas de Matemática del IEN UNI: Aritmética (divisibilidad, MCM/MCD, porcentajes, razones), Álgebra (ecuaciones, sistemas, desigualdades, funciones), Geometría (triángulos, circunferencia, áreas, semejanza), Trigonometría (razones, identidades, aplicaciones).` },
+      'Física': { count: 7, prompt: `Genera 7 preguntas de Física del IEN UNI: Cinemática, dinámica, trabajo y energía, estática, hidrostática, termodinámica, electricidad, magnetismo, ondas, óptica, física moderna.` },
+      'Química': { count: 7, prompt: `Genera 7 preguntas de Química del IEN UNI: Estructura atómica, tabla periódica, enlaces químicos, estequiometría, reacciones químicas, química orgánica básica.` }
+    };
 
-    systemPrompt = `Eres un generador de preguntas para el Examen de Ingreso Escolar Nacional (IEN) de la Universidad Nacional de Ingeniería (UNI) de Perú.
+    const config = topicConfigs[topic] || { count: numQuestions, prompt: `Genera ${numQuestions} preguntas sobre: ${topic}` };
 
-El examen IEN consta de las siguientes áreas:
-1. MATEMÁTICA: Aritmética, Álgebra, Geometría, Trigonometría, Estadística
-2. FÍSICA: Mecánica, Electricidad, Magnetismo, Óptica, Ondas
-3. QUÍMICA: Química General, Química Orgánica, Química Inorgánica, Estequiometría
-4. RAZONAMIENTO VERBAL: Comprensión lectora, Analogías verbales, Ortografía
-5. RAZONAMIENTO MATEMÁTICO: Secuencias numéricas, Problemas lógicos, Razonamiento abstracto
+    systemPrompt = `Eres un experto creador de exámenes de admisión para la Universidad Nacional de Ingeniería (UNI) de Perú. Conoces perfectamente la estructura, nivel y estilo del Examen de Ingreso Escolar Nacional (IEN).
 
-${topicDescription}
+CONTEXTO DE MATERIALES DE REFERENCIA DEL ADMINISTRADOR:
+${context || 'No hay materiales de referencia disponibles. Genera preguntas basándote en tu conocimiento del examen IEN UNI.'}
+
+INSTRUCCIONES:
+${config.prompt}
 
 FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 {
   "preguntas": [
     {
       "texto": "Texto de la pregunta",
-      "opciones": ["Opción A", "Opción B", "Opción C", "Opción D"],
+      "opciones": ["A) Opción 1", "B) Opción 2", "C) Opción 3", "D) Opción 4", "E) Opción 5"],
       "respuestaCorrecta": 0,
-      "area": "Matemática",
-      "explicacion": "Breve explicación de la respuesta correcta"
+      "area": "PE1/PE2/PE3",
+      "subtema": "Subtema específico",
+      "explicacion": "Breve explicación"
     }
   ]
 }
 
-REGLAS:
-- Las preguntas deben ser de nivel ingreso universitario (16-18 años)
-- Cada pregunta tiene exactamente 4 opciones
-- respuestaCorrecta es el índice (0-3) de la opción correcta
-- El campo "area" indica a qué área del examen IEN pertenece
-- Incluye una explicación breve para cada respuesta
+REGLAS IMPORTANTES:
+- Nivel: Estudiantes de 5to de secundaria (16-18 años)
+- El examen IEN usa 5 opciones (A-E), NO 4
+- respuestaCorrecta es el índice (0-4) de la opción correcta
+- Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
 - Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
-- No repitas conceptos entre preguntas
-- Usa el contexto de referencia si está disponible para guiar la dificultad`;
+- Si hay materiales de referencia del administrador, úsalos como guía de estilo y dificultad
+- NO repitas conceptos entre preguntas
+- Preguntas tipo examen UNI: problemas con datos numéricos, interpretación de textos, análisis de situaciones`;
   } else {
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
 
@@ -117,9 +154,7 @@ REGLAS:
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: topic === 'Examen Completo IEN' 
-            ? `Genera un examen completo del IEN con 30 preguntas distribuidas: 6 Matemática, 5 Física, 5 Química, 7 Razonamiento Verbal, 7 Razonamiento Matemático. ${context ? 'Usa el contexto de referencia para guiar la dificultad.' : ''}`
-            : `Genera ${numQuestions} preguntas del área "${topic}" para el examen IEN de la UNI. ${context ? 'Usa el contexto de referencia para guiar la dificultad.' : ''}` }
+          { role: 'user', content: `Genera las ${config.count} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? 'IMPORTANTE: Usa el contexto de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas.' : ''}` }
         ],
         max_tokens: 4096,
         temperature: 0.8
