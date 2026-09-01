@@ -30,6 +30,7 @@ module.exports = async function handler(req, res) {
     : '';
 
   let systemPrompt = '';
+  let config = { count: numQuestions, prompt: '' };
 
   if (type === 'simulacro') {
     const topicConfigs = {
@@ -73,7 +74,7 @@ Cada pregunta debe incluir "area" y "subtema".`
       'Química': { count: 7, prompt: `Genera 7 preguntas de Química del IEN UNI: Estructura atómica, tabla periódica, enlaces químicos, estequiometría, reacciones químicas, química orgánica básica.` }
     };
 
-    const config = topicConfigs[topic] || { count: numQuestions, prompt: `Genera ${numQuestions} preguntas sobre: ${topic}` };
+    config = topicConfigs[topic] || { count: numQuestions, prompt: `Genera ${numQuestions} preguntas sobre: ${topic}` };
 
     systemPrompt = `Eres un experto creador de exámenes de admisión para la Universidad Nacional de Ingeniería (UNI) de Perú. Conoces perfectamente la estructura, nivel y estilo del Examen de Ingreso Escolar Nacional (IEN).
 
@@ -107,6 +108,7 @@ REGLAS IMPORTANTES:
 - NO repitas conceptos entre preguntas
 - Preguntas tipo examen UNI: problemas con datos numéricos, interpretación de textos, análisis de situaciones`;
   } else {
+    config = { count: numQuestions, prompt: '' };
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
 
 FRAMEWORKS A USAR:
@@ -156,7 +158,7 @@ REGLAS:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Genera las ${config.count} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? 'IMPORTANTE: Usa el contexto de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas.' : ''}` }
         ],
-        max_tokens: 4096,
+        max_tokens: 16384,
         temperature: 0.8
       })
     });
