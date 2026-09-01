@@ -63,6 +63,15 @@
         .tab-content.active { display: block; }
         .download-link { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; background: #f0f4f8; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.85rem; border: 1px solid #e0e0e0; transition: all 0.2s; }
         .download-link:hover { background: #ff6b6b; color: white; border-color: #ff6b6b; }
+        .simulacro-timer { position: fixed; top: 70px; right: 20px; background: #1a1a2e; color: #00c896; padding: 0.8rem 1.5rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .simulacro-timer.warning { color: #e74c3c; animation: pulse 1s infinite; }
+        .simulacro-question { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+        .simulacro-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.3s; }
+        .simulacro-option:hover { border-color: #ff6b6b; background: #fff5f5; }
+        .simulacro-option:has(input:checked) { border-color: #ff6b6b; background: #fff5f5; }
+        .simulacro-result { background: white; border-radius: 12px; padding: 3rem; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        .simulacro-progress { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 2rem; }
+        .simulacro-progress-fill { height: 100%; background: #ff6b6b; transition: width 0.3s; }
         @media (max-width: 768px) { .hero h1 { font-size: 2rem; } nav { display: none; } .university-grid { grid-template-columns: 1fr 1fr; } }
     </style>
 </head>
@@ -127,10 +136,10 @@
         <div style="max-width: 800px; margin: 0 auto;">
             <h2 id="content-title">Contenido UNI</h2>
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="showTab('temarios')">📚 Temarios</button>
-                <button class="tab-btn" onclick="showTab('examenes')">📝 Exámenes</button>
-                <button class="tab-btn" onclick="showTab('simulacro')" id="tab-btn-simulacro" style="display: none;">🎯 Simulacro IEN</button>
-                <button class="tab-btn" onclick="showTab('materiales')">📎 Materiales</button>
+                <button class="tab-btn active" data-tab="temarios" onclick="showTab('temarios')">📚 Temarios</button>
+                <button class="tab-btn" data-tab="examenes" onclick="showTab('examenes')">📝 Exámenes</button>
+                <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" style="display: none;" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
+                <button class="tab-btn" data-tab="materiales" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
             <div id="tab-temarios" class="tab-content active">
@@ -149,17 +158,6 @@
             </div>
 
             <div id="tab-simulacro" class="tab-content">
-                <style>
-                    .simulacro-timer { position: fixed; top: 70px; right: 20px; background: #1a1a2e; color: #00c896; padding: 0.8rem 1.5rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-                    .simulacro-timer.warning { color: #e74c3c; animation: pulse 1s infinite; }
-                    .simulacro-question { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
-                    .simulacro-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.3s; }
-                    .simulacro-option:hover { border-color: #ff6b6b; background: #fff5f5; }
-                    .simulacro-option:has(input:checked) { border-color: #ff6b6b; background: #fff5f5; }
-                    .simulacro-result { background: white; border-radius: 12px; padding: 3rem; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-                    .simulacro-progress { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 2rem; }
-                    .simulacro-progress-fill { height: 100%; background: #ff6b6b; transition: width 0.3s; }
-                </style>
                 <div class="simulacro-timer" id="simulacro-timer" style="display: none;">00:00</div>
 
                 <div id="simulacro-list-area">
@@ -217,38 +215,40 @@
         <p>📱 WhatsApp: 933 884 059 • 📸 <a href="https://www.instagram.com/acad_area52/" target="_blank">@acad_area52</a></p>
     </footer>
 
+    <script>
+        window.selectUni = function(el) {
+            document.querySelectorAll(".uni-card").forEach(c => c.classList.remove("active"));
+            el.classList.add("active");
+            window._selectedUni = el.dataset.uni;
+            document.getElementById("content-title").textContent = "Contenido " + el.dataset.uni;
+            document.getElementById("tab-btn-simulacro").style.display = el.dataset.uni === "UNI" ? "inline-block" : "none";
+            if (el.dataset.uni !== "UNI") {
+                var simTab = document.getElementById("tab-simulacro");
+                if (simTab && simTab.classList.contains("active")) {
+                    window.showTab("temarios");
+                }
+            }
+            if (window._filterAndRender) window._filterAndRender();
+        };
+        window.showTab = function(tab) {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+            if (btn) btn.classList.add("active");
+            var target = document.getElementById("tab-" + tab);
+            if (target) target.classList.add("active");
+            if (tab === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+        };
+        window._selectedUni = "UNI";
+    </script>
     <script type="module">
         import { supabase } from "/js/supabase-config.js";
 
-        let selectedUni = "UNI";
         let allTemarios = [];
         let allExamenes = [];
         let allMateriales = [];
 
-        window.selectUni = function(el) {
-            document.querySelectorAll(".uni-card").forEach(c => c.classList.remove("active"));
-            el.classList.add("active");
-            selectedUni = el.dataset.uni;
-            document.getElementById("content-title").textContent = "Contenido " + selectedUni;
-            document.getElementById("tab-btn-simulacro").style.display = selectedUni === "UNI" ? "inline-block" : "none";
-            if (selectedUni !== "UNI") {
-                const simTab = document.getElementById("tab-simulacro");
-                if (simTab.classList.contains("active")) {
-                    showTab("temarios");
-                    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-                    document.querySelector('.tab-btn').classList.add("active");
-                }
-            }
-            filterAndRender();
-        };
-
-        window.showTab = function(tab) {
-            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-            event.target.classList.add("active");
-            document.getElementById("tab-" + tab).classList.add("active");
-            if (tab === "simulacro") loadSimulacrosIEN();
-        };
+        window._filterAndRender = function() { filterAndRender(); };
 
         async function loadData() {
             const [temarios, examenes, materiales] = await Promise.all([
@@ -263,9 +263,10 @@
         }
 
         function filterAndRender() {
-            const filterTemarios = allTemarios.filter(t => (t.universidad || "UNI") === selectedUni);
-            const filterExamenes = allExamenes.filter(e => (e.universidad || "UNI") === selectedUni);
-            const filterMateriales = allMateriales.filter(m => (m.universidad || "UNI") === selectedUni);
+            const uni = window._selectedUni || "UNI";
+            const filterTemarios = allTemarios.filter(t => (t.universidad || "UNI") === uni);
+            const filterExamenes = allExamenes.filter(e => (e.universidad || "UNI") === uni);
+            const filterMateriales = allMateriales.filter(m => (m.universidad || "UNI") === uni);
 
             renderWithFilter("temarios-list", "temarios-filter", filterTemarios, "curso", renderTemario);
             renderWithFilter("examenes-list", "examenes-filter", filterExamenes, "materia", renderExamen);
@@ -555,7 +556,7 @@
                 </div>`;
         };
 
-        if (selectedUni === "UNI") {
+        if (window._selectedUni === "UNI") {
             document.getElementById("tab-btn-simulacro").style.display = "inline-block";
             loadSimulacrosIEN();
         }
