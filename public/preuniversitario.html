@@ -129,6 +129,7 @@
             <div class="tab-bar">
                 <button class="tab-btn active" onclick="showTab('temarios')">📚 Temarios</button>
                 <button class="tab-btn" onclick="showTab('examenes')">📝 Exámenes</button>
+                <button class="tab-btn" onclick="showTab('simulacro')" id="tab-btn-simulacro" style="display: none;">🎯 Simulacro IEN</button>
                 <button class="tab-btn" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
@@ -145,6 +146,59 @@
             <div id="tab-materiales" class="tab-content">
                 <div class="filter-bar" id="materiales-filter"></div>
                 <div id="materiales-list"></div>
+            </div>
+
+            <div id="tab-simulacro" class="tab-content">
+                <style>
+                    .simulacro-timer { position: fixed; top: 70px; right: 20px; background: #1a1a2e; color: #00c896; padding: 0.8rem 1.5rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+                    .simulacro-timer.warning { color: #e74c3c; animation: pulse 1s infinite; }
+                    .simulacro-question { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+                    .simulacro-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.3s; }
+                    .simulacro-option:hover { border-color: #ff6b6b; background: #fff5f5; }
+                    .simulacro-option:has(input:checked) { border-color: #ff6b6b; background: #fff5f5; }
+                    .simulacro-result { background: white; border-radius: 12px; padding: 3rem; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+                    .simulacro-progress { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 2rem; }
+                    .simulacro-progress-fill { height: 100%; background: #ff6b6b; transition: width 0.3s; }
+                </style>
+                <div class="simulacro-timer" id="simulacro-timer" style="display: none;">00:00</div>
+
+                <div id="simulacro-list-area">
+                    <div id="simulacro-choices"></div>
+                    <div id="simulacro-ai-section" style="display: none;">
+                        <div class="content-card" style="border-left: 4px solid #ff6b6b;">
+                            <h3 style="color: #1a1a2e; margin-bottom: 0.5rem;">🤖 Generar Simulacro IEN con IA</h3>
+                            <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Genera preguntas del examen de ingreso a la UNI por área o examen completo:</p>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                                <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+                                    <option value="Examen Completo IEN">Examen Completo IEN (60 preguntas - 2h 45min)</option>
+                                    <option value="PE1 - Aptitud Académica y Humanidades">PE1 - Aptitud Académica y Humanidades (33 preguntas)</option>
+                                    <option value="PE2 - Matemática">PE2 - Matemática (13 preguntas)</option>
+                                    <option value="PE3 - Física y Química">PE3 - Física y Química (14 preguntas)</option>
+                                    <option disabled style="background: #f0f0f0;">─── Subtemas ───</option>
+                                    <option value="Razonamiento Matemático">Razonamiento Matemático (12 preguntas)</option>
+                                    <option value="Razonamiento Verbal">Razonamiento Verbal (13 preguntas)</option>
+                                    <option value="Humanidades">Humanidades (8 preguntas)</option>
+                                    <option value="Matemática">Matemática (Aritmética, Álgebra, Geometría, Trigonometría)</option>
+                                    <option value="Física">Física (Mecánica, Electricidad, Óptica)</option>
+                                    <option value="Química">Química (General, Orgánica, Inorgánica)</option>
+                                </select>
+                                <select id="ai-count" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
+                                    <option value="10">10 preguntas</option>
+                                    <option value="15" selected>15 preguntas</option>
+                                    <option value="20">20 preguntas</option>
+                                    <option value="30">30 preguntas</option>
+                                    <option value="60">60 preguntas (Examen completo)</option>
+                                </select>
+                                <button class="btn btn-primary" id="btn-generate" onclick="generateIEN()" style="white-space: nowrap; border-color: #ff6b6b; background: #ff6b6b;">
+                                    Generar
+                                </button>
+                            </div>
+                            <div id="ai-status" style="display: none; color: #ff6b6b; font-size: 0.9rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="simulacro-test-area" style="display: none;"></div>
             </div>
         </div>
     </section>
@@ -176,6 +230,15 @@
             el.classList.add("active");
             selectedUni = el.dataset.uni;
             document.getElementById("content-title").textContent = "Contenido " + selectedUni;
+            document.getElementById("tab-btn-simulacro").style.display = selectedUni === "UNI" ? "inline-block" : "none";
+            if (selectedUni !== "UNI") {
+                const simTab = document.getElementById("tab-simulacro");
+                if (simTab.classList.contains("active")) {
+                    showTab("temarios");
+                    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                    document.querySelector('.tab-btn').classList.add("active");
+                }
+            }
             filterAndRender();
         };
 
@@ -184,6 +247,7 @@
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             event.target.classList.add("active");
             document.getElementById("tab-" + tab).classList.add("active");
+            if (tab === "simulacro") loadSimulacrosIEN();
         };
 
         async function loadData() {
@@ -296,6 +360,205 @@
         }
 
         loadData();
+
+        // === SIMULACRO IEN ===
+        let simulacroTimer = null;
+        let simulacroTimeLeft = 0;
+        let simulacroCurrentTest = null;
+        let simulacroAnswers = {};
+
+        async function fetchSimulacroContext(materia) {
+            const materiaMap = {
+                'Matemática': 'Matemática', 'Física': 'Física', 'Química': 'Química',
+                'Razonamiento Verbal': 'Razonamiento Verbal', 'Razonamiento Matemático': 'Razonamiento Matemático',
+                'Humanidades': 'Humanidades'
+            };
+            const materiaName = materiaMap[materia];
+            if (!materiaName) return '';
+            try {
+                const { data } = await supabase.from("materiales_referencia").select("titulo, descripcion").eq("materia", materiaName);
+                if (!data || data.length === 0) return "";
+                return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
+            } catch (e) { return ''; }
+        }
+
+        async function loadSimulacrosIEN() {
+            const choices = document.getElementById("simulacro-choices");
+            try {
+                const { data, error } = await supabase.from("simulacros_ien").select("*").order("fecha", { ascending: false });
+                if (error || !data || data.length === 0) {
+                    choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros guardados. Genera uno con IA:</p></div>';
+                } else {
+                    choices.innerHTML = "";
+                    data.forEach(item => {
+                        const numPreg = item.preguntas?.length || 0;
+                        const numArch = item.archivos?.length || 0;
+                        if (numPreg === 0 && numArch === 0) return;
+                        const card = document.createElement("div");
+                        card.className = "content-card";
+                        card.style.cursor = "pointer";
+                        const archInfo = numArch > 0 ? ` | ${numArch} archivo${numArch > 1 ? 's' : ''}` : '';
+                        card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p><p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${item.duracion || 60} min</p>`;
+                        card.onclick = () => startSimulacroIEN(item);
+                        choices.appendChild(card);
+                    });
+                    if (choices.children.length === 0) {
+                        choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros con contenido.</p></div>';
+                    }
+                }
+            } catch (e) {
+                choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
+            }
+            document.getElementById("simulacro-ai-section").style.display = "block";
+        }
+
+        window.generateIEN = async function() {
+            const topic = document.getElementById('ai-topic').value;
+            let count = parseInt(document.getElementById('ai-count').value);
+            let duration = 60;
+            if (topic === 'Examen Completo IEN') { count = 60; duration = 165; }
+            else if (topic === 'PE1 - Aptitud Académica y Humanidades') { count = 33; duration = 60; }
+            else if (topic === 'PE2 - Matemática') { count = 13; duration = 60; }
+            else if (topic === 'PE3 - Física y Química') { count = 14; duration = 105; }
+            const btn = document.getElementById('btn-generate');
+            const status = document.getElementById('ai-status');
+            btn.disabled = true; btn.textContent = 'Generando...';
+            status.style.display = 'block'; status.style.color = '#ff6b6b';
+            status.textContent = 'Buscando materiales de referencia...';
+            const context = await fetchSimulacroContext(topic);
+            status.textContent = 'La IA está creando tus preguntas, esto puede tardar unos segundos...';
+            try {
+                const res = await fetch('/api/generate-questions', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, type: 'simulacro', count, context })
+                });
+                const data = await res.json();
+                if (res.ok && data.preguntas && data.preguntas.length > 0) {
+                    startSimulacroIEN({
+                        titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN (60 preguntas)' : `Simulacro IEN: ${topic}`,
+                        descripcion: topic === 'Examen Completo IEN' ? 'Examen completo - 2h 45min (formato oficial UNI)' : `Preguntas por IA - ${topic}`,
+                        duracion: duration, preguntas: data.preguntas
+                    });
+                } else {
+                    status.style.color = '#e74c3c';
+                    status.textContent = 'No se pudieron generar las preguntas. Intenta con otro tema.';
+                }
+            } catch (err) {
+                status.style.color = '#e74c3c';
+                status.textContent = 'Error de conexión. Verifica tu internet.';
+            } finally { btn.disabled = false; btn.textContent = 'Generar'; }
+        };
+
+        function startSimulacroIEN(data) {
+            simulacroCurrentTest = data;
+            simulacroAnswers = {};
+            document.getElementById("simulacro-list-area").style.display = "none";
+            const testArea = document.getElementById("simulacro-test-area");
+            testArea.style.display = "block";
+
+            const hasFiles = data.archivos && data.archivos.length > 0;
+            const hasQuestions = data.preguntas && data.preguntas.length > 0;
+
+            if (hasFiles && !hasQuestions) {
+                let filesHtml = `<h2 style="margin-bottom: 1rem;">${data.titulo}</h2><p style="color:#666;margin-bottom:1.5rem;">${data.descripcion || ""}</p><div style="display:flex;flex-direction:column;gap:1rem;">`;
+                data.archivos.forEach(f => {
+                    const isImg = /\.(jpg|jpeg|png|webp)$/i.test(f.name || f.url);
+                    filesHtml += isImg ? `<div class="content-card" style="padding:1rem;"><p style="font-weight:bold;margin-bottom:0.5rem;">${f.name}</p><img src="${f.url}" style="width:100%;border-radius:8px;cursor:pointer;" onclick="window.open('${f.url}','_blank')"></div>` : `<div class="content-card" style="padding:1rem;display:flex;align-items:center;gap:1rem;"><span style="font-size:2rem;">📄</span><div style="flex:1;"><p style="font-weight:bold;">${f.name}</p><a href="${f.url}" target="_blank" style="color:#ff6b6b;">Abrir PDF</a></div></div>`;
+                });
+                filesHtml += `</div><button class="btn" onclick="location.reload()" style="margin-top:1.5rem;">Volver</button>`;
+                testArea.innerHTML = filesHtml;
+                return;
+            }
+            if (!hasQuestions) return;
+
+            simulacroTimeLeft = (data.duracion || 60) * 60;
+            document.getElementById("simulacro-timer").style.display = "block";
+            startSimulacroTimer();
+            renderSimulacroQuestions();
+        }
+
+        function startSimulacroTimer() {
+            simulacroTimer = setInterval(() => {
+                simulacroTimeLeft--;
+                const m = Math.floor(simulacroTimeLeft / 60).toString().padStart(2, "0");
+                const s = (simulacroTimeLeft % 60).toString().padStart(2, "0");
+                const t = document.getElementById("simulacro-timer");
+                t.textContent = `${m}:${s}`;
+                if (simulacroTimeLeft <= 300) t.classList.add("warning");
+                if (simulacroTimeLeft <= 0) { clearInterval(simulacroTimer); alert("¡Tiempo agotado!"); submitSimulacroIEN(); }
+            }, 1000);
+        }
+
+        function renderSimulacroQuestions() {
+            const area = document.getElementById("simulacro-test-area");
+            let html = `<div class="simulacro-progress"><div class="simulacro-progress-fill" style="width:0%"></div></div>`;
+            simulacroCurrentTest.preguntas.forEach((q, qi) => {
+                const areaColor = q.area === 'PE1' ? '#3498db' : q.area === 'PE2' ? '#e74c3c' : q.area === 'PE3' ? '#2ecc71' : '#ff6b6b';
+                const areaTag = q.area ? `<span style="display:inline-block;background:${areaColor};color:white;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-bottom:0.5rem;">${q.area}</span>` : '';
+                const subTag = q.subtema ? `<span style="display:inline-block;background:#f0f0f0;color:#333;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;margin-left:0.3rem;margin-bottom:0.5rem;">${q.subtema}</span>` : '';
+                html += `<div class="simulacro-question"><div>${areaTag}${subTag}</div><h3>${qi + 1}. ${q.texto}</h3>`;
+                q.opciones.forEach((o, oi) => {
+                    html += `<label class="simulacro-option"><input type="radio" name="sq-${qi}" value="${oi}" onchange="simulacroAnswers[${qi}] = ${oi}; updateSimulacroProgress()"><span>${o}</span></label>`;
+                });
+                html += `</div>`;
+            });
+            html += `<button class="btn btn-primary" onclick="submitSimulacroIEN()" style="width:100%;padding:1rem;border-color:#ff6b6b;background:#ff6b6b;">Entregar Simulacro</button>`;
+            area.innerHTML = html;
+            window.simulacroAnswers = simulacroAnswers;
+        }
+
+        window.updateSimulacroProgress = function() {
+            const total = simulacroCurrentTest.preguntas.length;
+            const answered = Object.keys(window.simulacroAnswers).length;
+            document.querySelector(".simulacro-progress-fill").style.width = ((answered / total) * 100) + "%";
+        };
+
+        window.submitSimulacroIEN = function() {
+            clearInterval(simulacroTimer);
+            document.getElementById("simulacro-timer").style.display = "none";
+            const total = simulacroCurrentTest.preguntas.length;
+            let correct = 0;
+            const areaResults = {};
+            simulacroCurrentTest.preguntas.forEach((q, qi) => {
+                const isCorrect = window.simulacroAnswers[qi] === q.respuestaCorrecta;
+                if (isCorrect) correct++;
+                if (q.area) {
+                    if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, total: 0 };
+                    areaResults[q.area].total++;
+                    if (isCorrect) areaResults[q.area].correct++;
+                }
+            });
+            const pct = Math.round((correct / total) * 100);
+            const elapsed = (simulacroCurrentTest.duracion || 60) * 60 - simulacroTimeLeft;
+            const elapsedMin = Math.floor(elapsed / 60);
+            let msg = pct >= 80 ? "Excelente! Estás bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas áreas." : "Necesitas estudiar más. ¡No te rindas!";
+
+            let breakdown = '';
+            if (Object.keys(areaResults).length > 1) {
+                const colors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
+                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultados por Prueba:</h3>';
+                for (const [name, d] of Object.entries(areaResults)) {
+                    const p = Math.round((d.correct / d.total) * 100);
+                    breakdown += `<div style="margin-bottom:0.8rem;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${colors[name] || '#333'};">${name}</span><span style="color:#ff6b6b;">${d.correct}/${d.total} (${p}%)</span></div><div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${p}%;background:${p >= 70 ? '#00c896' : p >= 50 ? '#f39c12' : '#e74c3c'};border-radius:4px;"></div></div></div>`;
+                }
+                breakdown += '</div>';
+            }
+
+            document.getElementById("simulacro-test-area").innerHTML = `
+                <div class="simulacro-result">
+                    <h2 style="color:#ff6b6b;font-size:3rem;">${correct}/${total}</h2>
+                    <p style="font-size:1.5rem;color:#333;">${pct}% de aciertos</p>
+                    <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
+                    ${breakdown}
+                    <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${msg}</p>
+                    <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
+                </div>`;
+        };
+
+        if (selectedUni === "UNI") {
+            document.getElementById("tab-btn-simulacro").style.display = "inline-block";
+            loadSimulacrosIEN();
+        }
     </script>
     <script src="/js/chat.js"></script>
 </body>
