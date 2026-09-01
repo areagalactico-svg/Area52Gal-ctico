@@ -104,45 +104,56 @@
       const materiaName = materiaMap[materia];
       if (!materiaName) return '';
       
-      const { data } = await supabase
-        .from("materiales_referencia")
-        .select("titulo, descripcion")
-        .eq("materia", materiaName);
-      if (!data || data.length === 0) return "";
-      return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
+      try {
+        const { data, error } = await supabase
+          .from("materiales_referencia")
+          .select("titulo, descripcion")
+          .eq("materia", materiaName);
+        if (error || !data || data.length === 0) return "";
+        return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
+      } catch (e) {
+        return '';
+      }
     }
 
     async function loadSimulacros() {
-      const { data } = await supabase
-        .from("simulacros_ien")
-        .select("*")
-        .order("fecha", { ascending: false });
-
       const list = document.getElementById("simulacros-list");
+      try {
+        const { data, error } = await supabase
+          .from("simulacros_ien")
+          .select("*")
+          .order("fecha", { ascending: false });
 
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
-      } else {
-        list.innerHTML = "";
-        data.forEach(item => {
-          const numPreguntas = item.preguntas?.length || 0;
-          const numArchivos = item.archivos?.length || 0;
-          if (numPreguntas === 0 && numArchivos === 0) return;
-          const card = document.createElement("div");
-          card.className = "test-card";
-          const archivosInfo = numArchivos > 0 ? `<span style="color: #888;"> | ${numArchivos} archivo${numArchivos > 1 ? 's' : ''}</span>` : '';
-          const preguntasInfo = numPreguntas > 0 ? `${numPreguntas} preguntas` : 'Solo archivos';
-          card.innerHTML = `
-            <h3>${item.titulo}</h3>
-            <p style="color: #666; margin: 0.5rem 0;">${item.descripcion || ""}</p>
-            <p style="color: #00c896; font-weight: bold;">${preguntasInfo} ${archivosInfo} | ${item.duracion || 60} minutos</p>
-          `;
-          card.onclick = () => startSimulacro(item);
-          list.appendChild(card);
-        });
-        if (list.children.length === 0) {
-          list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros con contenido.</p></div>';
+        if (error) {
+          console.error('Supabase error:', error);
+          list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
+        } else if (!data || data.length === 0) {
+          list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
+        } else {
+          list.innerHTML = "";
+          data.forEach(item => {
+            const numPreguntas = item.preguntas?.length || 0;
+            const numArchivos = item.archivos?.length || 0;
+            if (numPreguntas === 0 && numArchivos === 0) return;
+            const card = document.createElement("div");
+            card.className = "test-card";
+            const archivosInfo = numArchivos > 0 ? `<span style="color: #888;"> | ${numArchivos} archivo${numArchivos > 1 ? 's' : ''}</span>` : '';
+            const preguntasInfo = numPreguntas > 0 ? `${numPreguntas} preguntas` : 'Solo archivos';
+            card.innerHTML = `
+              <h3>${item.titulo}</h3>
+              <p style="color: #666; margin: 0.5rem 0;">${item.descripcion || ""}</p>
+              <p style="color: #00c896; font-weight: bold;">${preguntasInfo} ${archivosInfo} | ${item.duracion || 60} minutos</p>
+            `;
+            card.onclick = () => startSimulacro(item);
+            list.appendChild(card);
+          });
+          if (list.children.length === 0) {
+            list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros con contenido.</p></div>';
+          }
         }
+      } catch (e) {
+        console.error('Load error:', e);
+        list.innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
       }
       document.getElementById('ai-generate-section').style.display = 'block';
     }
@@ -153,16 +164,14 @@
     window.startSimulacro = function(data) {
       currentTest = data;
       answers = {};
-      timeLeft = (data.duracion || 60) * 60;
-
-      document.getElementById("simulacros-list").style.display = "none";
-      document.getElementById("ai-generate-section").style.display = "none";
-      document.getElementById("test-area").style.display = "block";
 
       const hasFiles = data.archivos && data.archivos.length > 0;
       const hasQuestions = data.preguntas && data.preguntas.length > 0;
 
       if (hasFiles && !hasQuestions) {
+        document.getElementById("simulacros-list").style.display = "none";
+        document.getElementById("ai-generate-section").style.display = "none";
+        document.getElementById("test-area").style.display = "block";
         document.getElementById("timer").style.display = "none";
         let filesHtml = `<h2 style="margin-bottom: 1rem;">${data.titulo}</h2>`;
         filesHtml += `<p style="color: #666; margin-bottom: 1.5rem;">${data.descripcion || ""}</p>`;
@@ -172,7 +181,7 @@
           if (isImage) {
             filesHtml += `
               <div class="card" style="padding: 1rem;">
-                <p style="font-weight: bold; margin-bottom: 0.5rem;">🖼️ ${file.name}</p>
+                <p style="font-weight: bold; margin-bottom: 0.5rem;">${file.name}</p>
                 <img src="${file.url}" alt="${file.name}" style="width: 100%; border-radius: 8px; cursor: pointer;" onclick="window.open('${file.url}', '_blank')">
               </div>
             `;
@@ -194,7 +203,12 @@
         return;
       }
 
-      if (!confirm("El cronómetro comenzará ahora. ¿Estás listo?")) return;
+      if (!hasQuestions) return;
+
+      timeLeft = (data.duracion || 60) * 60;
+      document.getElementById("simulacros-list").style.display = "none";
+      document.getElementById("ai-generate-section").style.display = "none";
+      document.getElementById("test-area").style.display = "block";
       document.getElementById("timer").style.display = "block";
       startTimer();
       renderQuestions();
@@ -388,7 +402,11 @@
       }
     };
 
-    loadSimulacros();
+    loadSimulacros().catch(e => {
+      console.error('Init error:', e);
+      document.getElementById('simulacros-list').innerHTML = '<div class="card"><p style="text-align: center; color: #888;">No hay simulacros guardados.</p></div>';
+      document.getElementById('ai-generate-section').style.display = 'block';
+    });
   </script>
   <script src="/js/chat.js"></script>
 </body>
