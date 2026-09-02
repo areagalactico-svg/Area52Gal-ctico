@@ -18,6 +18,7 @@ CREATE TABLE simulacros_ien (
   titulo TEXT NOT NULL,
   descripcion TEXT,
   duracion INTEGER DEFAULT 60,
+  universidad TEXT DEFAULT 'UNI',
   preguntas JSONB DEFAULT '[]',
   archivos JSONB DEFAULT '[]',
   fecha TIMESTAMPTZ DEFAULT NOW()
@@ -90,6 +91,11 @@ INSERT INTO storage.buckets (id, name, public) VALUES
   ('materiales', 'materiales', true);
 
 -- ============================================
+-- Migración: Agregar columna universidad a simulacros_ien
+-- Ejecutar en Supabase SQL Editor si la tabla ya existe:
+-- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
+-- ============================================
+
 -- RLS (Row Level Security) Policies
 -- ============================================
 

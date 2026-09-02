@@ -118,10 +118,13 @@ async function loadCollection(key) {
   data.forEach(item => {
     const div = document.createElement("div");
     div.className = "list-item";
+    const extra = item.universidad ? ` | ${item.universidad}` : (item.materia ? ` | ${item.materia}` : "");
+    const filesCount = item.archivos?.length || 0;
+    const filesInfo = filesCount > 0 ? ` | ${filesCount} archivo${filesCount > 1 ? 's' : ''}` : "";
     div.innerHTML = `
       <div class="item-info">
         <h4>${item.titulo || item.nombre || "Sin título"}</h4>
-        <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}</p>
+        <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}${extra}${filesInfo}</p>
       </div>
       <div class="item-actions">
         <button class="btn btn-sm" onclick="editItem('${col.table}', '${item.id}', '${col.type}')">Editar</button>
@@ -173,8 +176,7 @@ window.openModal = async function(type, editData = null, editId = null) {
 
   switch(type) {
     case "test":
-    case "simulacro":
-      title.textContent = editData ? "Editar " + (type === "test" ? "Test" : "Simulacro") : "Nuevo " + (type === "test" ? "Test" : "Simulacro");
+      title.textContent = editData ? "Editar Test" : "Nuevo Test";
       body.innerHTML = `
         <div class="form-group">
           <label>Título</label>
@@ -184,15 +186,53 @@ window.openModal = async function(type, editData = null, editId = null) {
           <label>Descripción</label>
           <textarea id="field-descripcion" placeholder="Describe el test...">${editData?.descripcion || ""}</textarea>
         </div>
-        ${type === "simulacro" ? `
-        <div class="form-group">
-          <label>Duración (minutos)</label>
-          <input type="number" id="field-duracion" value="${editData?.duracion || 60}" min="1">
-        </div>` : ""}
         <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
           <small style="color: #888;">Selecciona varios archivos (PDF, JPG, PNG)</small>
+          <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
+        </div>
+        <div class="form-group">
+          <label>Preguntas interactivas (${questions.length} actuales)</label>
+          <p style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">Opcional: preguntas de opción múltiple</p>
+          <div id="questions-container"></div>
+          <button class="btn btn-sm" onclick="addQuestion()" style="margin-top: 0.5rem;">+ Agregar Pregunta</button>
+        </div>
+      `;
+      renderQuestions();
+      renderExistingFiles();
+      break;
+
+    case "simulacro":
+      title.textContent = editData ? "Editar Simulacro" : "Nuevo Simulacro IEN";
+      body.innerHTML = `
+        <div class="form-group">
+          <label>Universidad</label>
+          <select id="field-universidad">
+            <option value="UNI" ${editData?.universidad === "UNI" ? "selected" : ""}>UNI</option>
+            <option value="San Marcos" ${editData?.universidad === "San Marcos" ? "selected" : ""}>San Marcos</option>
+            <option value="Católica" ${editData?.universidad === "Católica" ? "selected" : ""}>Católica</option>
+            <option value="La Molina" ${editData?.universidad === "La Molina" ? "selected" : ""}>La Molina</option>
+            <option value="San Martín" ${editData?.universidad === "San Martín" ? "selected" : ""}>San Martín</option>
+            <option value="Pacifico" ${editData?.universidad === "Pacifico" ? "selected" : ""}>Pacífico</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Título</label>
+          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN UNI 2023">
+        </div>
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea id="field-descripcion" placeholder="Describe el examen/simulacro...">${editData?.descripcion || ""}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Duración (minutos)</label>
+          <input type="number" id="field-duracion" value="${editData?.duracion || 60}" min="1">
+        </div>
+        <div class="form-group">
+          <label>Archivos del examen (PDF o imágenes)</label>
+          <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
+          <small style="color: #888;">Sube exámenes pasados, imágenes de preguntas, etc. La IA usará estos archivos como referencia.</small>
           <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
         </div>
         <div class="form-group">
@@ -500,16 +540,27 @@ async function saveItem() {
 
   switch(currentType) {
     case "test":
-    case "simulacro":
       data.titulo = document.getElementById("field-titulo").value;
       data.descripcion = document.getElementById("field-descripcion").value;
       data.preguntas = questions;
-      if (currentType === "simulacro") {
-        data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
+      const fileInputTest = document.getElementById("field-archivos");
+      if (fileInputTest?.files.length > 0) {
+        const uploaded = await uploadFiles(fileInputTest.files, "examenes");
+        data.archivos = [...existingFiles, ...uploaded];
+      } else {
+        data.archivos = existingFiles;
       }
-      const fileInput = document.getElementById("field-archivos");
-      if (fileInput?.files.length > 0) {
-        const uploaded = await uploadFiles(fileInput.files, BUCKET_MAP[currentType]);
+      break;
+
+    case "simulacro":
+      data.titulo = document.getElementById("field-titulo").value;
+      data.descripcion = document.getElementById("field-descripcion").value;
+      data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
+      data.preguntas = questions;
+      data.universidad = document.getElementById("field-universidad").value;
+      const fileInputSim = document.getElementById("field-archivos");
+      if (fileInputSim?.files.length > 0) {
+        const uploaded = await uploadFiles(fileInputSim.files, BUCKET_MAP[currentType]);
         data.archivos = [...existingFiles, ...uploaded];
       } else {
         data.archivos = existingFiles;

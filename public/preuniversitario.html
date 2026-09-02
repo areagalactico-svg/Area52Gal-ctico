@@ -374,6 +374,23 @@
             const contextParts = [];
 
             try {
+                const { data: simulacros } = await supabase.from("simulacros_ien")
+                    .select("titulo, descripcion, universidad, archivos, preguntas")
+                    .eq("universidad", "UNI");
+                if (simulacros && simulacros.length > 0) {
+                    simulacros.forEach(s => {
+                        if (!s.preguntas || s.preguntas.length === 0) return;
+                        let entry = `- Simulacro admin: ${s.titulo} (${s.preguntas.length} preguntas)`;
+                        if (s.descripcion) entry += ` - ${s.descripcion}`;
+                        if (s.archivos && s.archivos.length > 0) {
+                            entry += `\n  Archivos: ${s.archivos.map(f => f.name).join(', ')}`;
+                        }
+                        contextParts.push(entry);
+                    });
+                }
+            } catch (e) {}
+
+            try {
                 const { data: materiales } = await supabase.from("materiales_referencia")
                     .select("titulo, descripcion, archivos, materia")
                     .eq("universidad", "UNI");
@@ -382,7 +399,7 @@
                         ? materiales.filter(m => ienMaterias.includes(m.materia) || m.materia === "General")
                         : materiales.filter(m => m.materia === materia || m.materia === "General");
                     filtered.forEach(m => {
-                        let entry = `- ${m.titulo} (${m.materia}): ${m.descripcion || "Sin descripción"}`;
+                        let entry = `- Material: ${m.titulo} (${m.materia}): ${m.descripcion || "Sin descripción"}`;
                         if (m.archivos && m.archivos.length > 0) {
                             entry += `\n  Archivos: ${m.archivos.map(f => f.name).join(', ')}`;
                         }
@@ -416,7 +433,7 @@
         async function loadSimulacrosIEN() {
             const choices = document.getElementById("simulacro-choices");
             try {
-                const { data, error } = await supabase.from("simulacros_ien").select("*").order("fecha", { ascending: false });
+                const { data, error } = await supabase.from("simulacros_ien").select("*").eq("universidad", "UNI").order("fecha", { ascending: false });
                 if (error || !data || data.length === 0) {
                     choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros guardados. Genera uno con IA:</p></div>';
                 } else {
