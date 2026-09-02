@@ -300,13 +300,23 @@ window.openModal = async function(type, editData = null, editId = null) {
         <div class="form-group">
           <label>Materia</label>
           <select id="field-materia">
-            <option value="Cálculo I" ${editData?.materia === "Cálculo I" ? "selected" : ""}>Cálculo I</option>
-            <option value="Cálculo II" ${editData?.materia === "Cálculo II" ? "selected" : ""}>Cálculo II</option>
-            <option value="Cálculo III" ${editData?.materia === "Cálculo III" ? "selected" : ""}>Cálculo III</option>
-            <option value="Física I" ${editData?.materia === "Física I" ? "selected" : ""}>Física I</option>
-            <option value="Física II" ${editData?.materia === "Física II" ? "selected" : ""}>Física II</option>
-            <option value="Álgebra Lineal" ${editData?.materia === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
-            <option value="Química" ${editData?.materia === "Química" ? "selected" : ""}>Química</option>
+            <optgroup label="Materias IEN (Preuniversitario)">
+              <option value="Matemática" ${editData?.materia === "Matemática" ? "selected" : ""}>Matemática (IEN)</option>
+              <option value="Física" ${editData?.materia === "Física" ? "selected" : ""}>Física (IEN)</option>
+              <option value="Química" ${editData?.materia === "Química" ? "selected" : ""}>Química (IEN)</option>
+              <option value="Razonamiento Verbal" ${editData?.materia === "Razonamiento Verbal" ? "selected" : ""}>Razonamiento Verbal (IEN)</option>
+              <option value="Razonamiento Matemático" ${editData?.materia === "Razonamiento Matemático" ? "selected" : ""}>Razonamiento Matemático (IEN)</option>
+              <option value="Humanidades" ${editData?.materia === "Humanidades" ? "selected" : ""}>Humanidades (IEN)</option>
+            </optgroup>
+            <optgroup label="Materias Universitarias">
+              <option value="Cálculo I" ${editData?.materia === "Cálculo I" ? "selected" : ""}>Cálculo I</option>
+              <option value="Cálculo II" ${editData?.materia === "Cálculo II" ? "selected" : ""}>Cálculo II</option>
+              <option value="Cálculo III" ${editData?.materia === "Cálculo III" ? "selected" : ""}>Cálculo III</option>
+              <option value="Física I" ${editData?.materia === "Física I" ? "selected" : ""}>Física I</option>
+              <option value="Física II" ${editData?.materia === "Física II" ? "selected" : ""}>Física II</option>
+              <option value="Álgebra Lineal" ${editData?.materia === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
+              <option value="Química General" ${editData?.materia === "Química General" ? "selected" : ""}>Química General</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -340,30 +350,40 @@ window.openModal = async function(type, editData = null, editId = null) {
         </div>
         <div class="form-group">
           <label>Nombre del material</label>
-          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN 2023 - Cálculo">
+          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN 2023 - Matemática">
         </div>
         <div class="form-group">
           <label>Materia / Tema</label>
           <select id="field-materia">
-            <option value="Cálculo I" ${editData?.materia === "Cálculo I" ? "selected" : ""}>Cálculo I</option>
-            <option value="Cálculo II" ${editData?.materia === "Cálculo II" ? "selected" : ""}>Cálculo II</option>
-            <option value="Cálculo III" ${editData?.materia === "Cálculo III" ? "selected" : ""}>Cálculo III</option>
-            <option value="Física I" ${editData?.materia === "Física I" ? "selected" : ""}>Física I</option>
-            <option value="Física II" ${editData?.materia === "Física II" ? "selected" : ""}>Física II</option>
-            <option value="Álgebra Lineal" ${editData?.materia === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
-            <option value="Química" ${editData?.materia === "Química" ? "selected" : ""}>Química</option>
-            <option value="Matemática Básica" ${editData?.materia === "Matemática Básica" ? "selected" : ""}>Matemática Básica</option>
-            <option value="General" ${editData?.materia === "General" ? "selected" : ""}>General</option>
+            <optgroup label="Materias IEN (Preuniversitario)">
+              <option value="Matemática" ${editData?.materia === "Matemática" ? "selected" : ""}>Matemática (IEN)</option>
+              <option value="Física" ${editData?.materia === "Física" ? "selected" : ""}>Física (IEN)</option>
+              <option value="Química" ${editData?.materia === "Química" ? "selected" : ""}>Química (IEN)</option>
+              <option value="Razonamiento Verbal" ${editData?.materia === "Razonamiento Verbal" ? "selected" : ""}>Razonamiento Verbal (IEN)</option>
+              <option value="Razonamiento Matemático" ${editData?.materia === "Razonamiento Matemático" ? "selected" : ""}>Razonamiento Matemático (IEN)</option>
+              <option value="Humanidades" ${editData?.materia === "Humanidades" ? "selected" : ""}>Humanidades (IEN)</option>
+            </optgroup>
+            <optgroup label="Materias Universitarias">
+              <option value="Cálculo I" ${editData?.materia === "Cálculo I" ? "selected" : ""}>Cálculo I</option>
+              <option value="Cálculo II" ${editData?.materia === "Cálculo II" ? "selected" : ""}>Cálculo II</option>
+              <option value="Cálculo III" ${editData?.materia === "Cálculo III" ? "selected" : ""}>Cálculo III</option>
+              <option value="Física I" ${editData?.materia === "Física I" ? "selected" : ""}>Física I</option>
+              <option value="Física II" ${editData?.materia === "Física II" ? "selected" : ""}>Física II</option>
+              <option value="Álgebra Lineal" ${editData?.materia === "Álgebra Lineal" ? "selected" : ""}>Álgebra Lineal</option>
+              <option value="Química General" ${editData?.materia === "Química General" ? "selected" : ""}>Química General</option>
+              <option value="Matemática Básica" ${editData?.materia === "Matemática Básica" ? "selected" : ""}>Matemática Básica</option>
+              <option value="General" ${editData?.materia === "General" ? "selected" : ""}>General</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
           <label>Descripción (opcional)</label>
-          <textarea id="field-descripcion" placeholder="Describe el contenido del material...">${editData?.descripcion || ""}</textarea>
+          <textarea id="field-descripcion" placeholder="Describe el contenido del material... La IA usará esto como referencia para generar simulacros y tests.${editData?.universidad === 'UNI' ? ' Para IEN: sube exámenes pasados del IEN UNI.' : ''}">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-material" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo.</small>
+          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo. La IA usará estos archivos como referencia.</small>
           <div id="existing-material-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;

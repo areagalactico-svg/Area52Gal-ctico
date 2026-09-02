@@ -78,8 +78,10 @@ Cada pregunta debe incluir "area" y "subtema".`
 
     systemPrompt = `Eres un experto creador de exámenes de admisión para la Universidad Nacional de Ingeniería (UNI) de Perú. Conoces perfectamente la estructura, nivel y estilo del Examen de Ingreso Escolar Nacional (IEN).
 
-CONTEXTO DE MATERIALES DE REFERENCIA DEL ADMINISTRADOR:
-${context || 'No hay materiales de referencia disponibles. Genera preguntas basándote en tu conocimiento del examen IEN UNI.'}
+MATERIALES DE REFERENCIA SUBIDOS POR EL ADMINISTRADOR:
+El administrador ha subido materiales de referencia (exámenes pasados, guías, preguntas tipo) que deben servirte como guía para el estilo, dificultad y tipo de preguntas a generar.
+
+${context || 'No hay materiales de referencia disponibles aún. Genera preguntas basándote en tu conocimiento del examen IEN UNI.'}
 
 INSTRUCCIONES:
 ${config.prompt}
@@ -104,9 +106,10 @@ REGLAS IMPORTANTES:
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
 - Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
-- Si hay materiales de referencia del administrador, úsalos como guía de estilo y dificultad
+- Si hay materiales de referencia del administrador, imita su estilo y nivel de dificultad
 - NO repitas conceptos entre preguntas
-- Preguntas tipo examen UNI: problemas con datos numéricos, interpretación de textos, análisis de situaciones`;
+- Preguntas tipo examen UNI: problemas con datos numéricos, interpretación de textos, análisis de situaciones
+- Cuando sea posible, genera preguntas similares a las encontradas en los materiales de referencia`;
   } else {
     config = { count: numQuestions, prompt: '' };
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
@@ -156,7 +159,7 @@ REGLAS:
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Genera las ${config.count} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? 'IMPORTANTE: Usa el contexto de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas.' : ''}` }
+          { role: 'user', content: `Genera las ${config.count || numQuestions} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? 'IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas.' : ''}` }
         ],
         max_tokens: 16384,
         temperature: 0.8

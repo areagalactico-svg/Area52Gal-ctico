@@ -369,18 +369,48 @@
         let simulacroAnswers = {};
 
         async function fetchSimulacroContext(materia) {
-            const materiaMap = {
-                'Matemática': 'Matemática', 'Física': 'Física', 'Química': 'Química',
-                'Razonamiento Verbal': 'Razonamiento Verbal', 'Razonamiento Matemático': 'Razonamiento Matemático',
-                'Humanidades': 'Humanidades'
-            };
-            const materiaName = materiaMap[materia];
-            if (!materiaName) return '';
+            const ienMaterias = ['Matemática', 'Física', 'Química', 'Razonamiento Verbal', 'Razonamiento Matemático', 'Humanidades'];
+            const isIENMateria = ienMaterias.includes(materia);
+            const contextParts = [];
+
             try {
-                const { data } = await supabase.from("materiales_referencia").select("titulo, descripcion").eq("materia", materiaName);
-                if (!data || data.length === 0) return "";
-                return data.map(m => `- ${m.titulo}: ${m.descripcion || "Sin descripción"}`).join("\n");
-            } catch (e) { return ''; }
+                const { data: materiales } = await supabase.from("materiales_referencia")
+                    .select("titulo, descripcion, archivos, materia")
+                    .eq("universidad", "UNI");
+                if (materiales && materiales.length > 0) {
+                    const filtered = isIENMateria
+                        ? materiales.filter(m => ienMaterias.includes(m.materia) || m.materia === "General")
+                        : materiales.filter(m => m.materia === materia || m.materia === "General");
+                    filtered.forEach(m => {
+                        let entry = `- ${m.titulo} (${m.materia}): ${m.descripcion || "Sin descripción"}`;
+                        if (m.archivos && m.archivos.length > 0) {
+                            entry += `\n  Archivos: ${m.archivos.map(f => f.name).join(', ')}`;
+                        }
+                        contextParts.push(entry);
+                    });
+                }
+            } catch (e) {}
+
+            try {
+                const { data: examenes } = await supabase.from("examenes")
+                    .select("titulo, materia, year, archivos, descripcion")
+                    .eq("universidad", "UNI");
+                if (examenes && examenes.length > 0) {
+                    const filtered = isIENMateria
+                        ? examenes.filter(e => ienMaterias.includes(e.materia) || e.materia === "General")
+                        : examenes.filter(e => e.materia === materia);
+                    filtered.forEach(e => {
+                        let entry = `- Examen: ${e.titulo} (${e.materia}, ${e.year || 's/a'})`;
+                        if (e.descripcion) entry += ` - ${e.descripcion}`;
+                        if (e.archivos && e.archivos.length > 0) {
+                            entry += `\n  Archivos: ${e.archivos.map(f => f.name).join(', ')}`;
+                        }
+                        contextParts.push(entry);
+                    });
+                }
+            } catch (e) {}
+
+            return contextParts.join("\n");
         }
 
         async function loadSimulacrosIEN() {
