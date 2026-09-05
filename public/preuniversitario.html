@@ -375,16 +375,14 @@
 
             try {
                 const { data: simulacros } = await supabase.from("simulacros_ien")
-                    .select("titulo, descripcion, universidad, archivos, preguntas")
+                    .select("titulo, descripcion, universidad, archivos, preguntas, contenido_texto")
                     .eq("universidad", "UNI");
                 if (simulacros && simulacros.length > 0) {
                     simulacros.forEach(s => {
                         if (!s.preguntas || s.preguntas.length === 0) return;
-                        let entry = `- Simulacro admin: ${s.titulo} (${s.preguntas.length} preguntas)`;
-                        if (s.descripcion) entry += ` - ${s.descripcion}`;
-                        if (s.archivos && s.archivos.length > 0) {
-                            entry += `\n  Archivos: ${s.archivos.map(f => f.name).join(', ')}`;
-                        }
+                        let entry = `=== SIMULACRO: ${s.titulo} (${s.preguntas.length} preguntas) ===`;
+                        if (s.descripcion) entry += `\nDescripción: ${s.descripcion}`;
+                        if (s.contenido_texto) entry += `\nCONTENIDO DEL EXAMEN:\n${s.contenido_texto}`;
                         contextParts.push(entry);
                     });
                 }
@@ -392,17 +390,16 @@
 
             try {
                 const { data: materiales } = await supabase.from("materiales_referencia")
-                    .select("titulo, descripcion, archivos, materia")
+                    .select("titulo, descripcion, archivos, materia, contenido_texto")
                     .eq("universidad", "UNI");
                 if (materiales && materiales.length > 0) {
                     const filtered = isIENMateria
                         ? materiales.filter(m => ienMaterias.includes(m.materia) || m.materia === "General")
                         : materiales.filter(m => m.materia === materia || m.materia === "General");
                     filtered.forEach(m => {
-                        let entry = `- Material: ${m.titulo} (${m.materia}): ${m.descripcion || "Sin descripción"}`;
-                        if (m.archivos && m.archivos.length > 0) {
-                            entry += `\n  Archivos: ${m.archivos.map(f => f.name).join(', ')}`;
-                        }
+                        let entry = `=== MATERIAL: ${m.titulo} (${m.materia}) ===`;
+                        if (m.descripcion) entry += `\nDescripción: ${m.descripcion}`;
+                        if (m.contenido_texto) entry += `\nCONTENIDO DEL EXAMEN:\n${m.contenido_texto}`;
                         contextParts.push(entry);
                     });
                 }
@@ -410,24 +407,22 @@
 
             try {
                 const { data: examenes } = await supabase.from("examenes")
-                    .select("titulo, materia, year, archivos, descripcion")
+                    .select("titulo, materia, year, archivos, descripcion, contenido_texto")
                     .eq("universidad", "UNI");
                 if (examenes && examenes.length > 0) {
                     const filtered = isIENMateria
                         ? examenes.filter(e => ienMaterias.includes(e.materia) || e.materia === "General")
                         : examenes.filter(e => e.materia === materia);
                     filtered.forEach(e => {
-                        let entry = `- Examen: ${e.titulo} (${e.materia}, ${e.year || 's/a'})`;
-                        if (e.descripcion) entry += ` - ${e.descripcion}`;
-                        if (e.archivos && e.archivos.length > 0) {
-                            entry += `\n  Archivos: ${e.archivos.map(f => f.name).join(', ')}`;
-                        }
+                        let entry = `=== EXAMEN: ${e.titulo} (${e.materia}, ${e.year || 's/a'}) ===`;
+                        if (e.descripcion) entry += `\nDescripción: ${e.descripcion}`;
+                        if (e.contenido_texto) entry += `\nCONTENIDO DEL EXAMEN:\n${e.contenido_texto}`;
                         contextParts.push(entry);
                     });
                 }
             } catch (e) {}
 
-            return contextParts.join("\n");
+            return contextParts.join("\n\n");
         }
 
         async function loadSimulacrosIEN() {

@@ -21,6 +21,7 @@ CREATE TABLE simulacros_ien (
   universidad TEXT DEFAULT 'UNI',
   preguntas JSONB DEFAULT '[]',
   archivos JSONB DEFAULT '[]',
+  contenido_texto TEXT DEFAULT '',
   fecha TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -50,7 +51,9 @@ CREATE TABLE examenes (
   descripcion TEXT,
   year INTEGER,
   materia TEXT,
+  universidad TEXT DEFAULT 'UNI',
   archivos JSONB DEFAULT '[]',
+  contenido_texto TEXT DEFAULT '',
   fecha TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -60,7 +63,9 @@ CREATE TABLE materiales_referencia (
   titulo TEXT NOT NULL,
   materia TEXT,
   descripcion TEXT,
+  universidad TEXT DEFAULT 'UNI',
   archivos JSONB DEFAULT '[]',
+  contenido_texto TEXT DEFAULT '',
   fecha TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -91,9 +96,15 @@ INSERT INTO storage.buckets (id, name, public) VALUES
   ('materiales', 'materiales', true);
 
 -- ============================================
--- Migración: Agregar columna universidad a simulacros_ien
--- Ejecutar en Supabase SQL Editor si la tabla ya existe:
+-- Migración: Agregar columnas faltantes a tablas existentes
+-- Ejecutar en Supabase SQL Editor si las tablas ya existen:
+--
 -- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
+-- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
+-- ALTER TABLE examenes ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
+-- ALTER TABLE examenes ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
+-- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
+-- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
 -- ============================================
 
 -- RLS (Row Level Security) Policies

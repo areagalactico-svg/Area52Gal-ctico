@@ -232,8 +232,13 @@ window.openModal = async function(type, editData = null, editId = null) {
         <div class="form-group">
           <label>Archivos del examen (PDF o imágenes)</label>
           <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Sube exámenes pasados, imágenes de preguntas, etc. La IA usará estos archivos como referencia.</small>
+          <small style="color: #888;">El PDF original como respaldo.</small>
           <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
+        </div>
+        <div class="form-group">
+          <label>Contenido del examen (texto copiado del PDF)</label>
+          <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA usará este contenido para generar las 60 preguntas del simulacro.">${editData?.contenido_texto || ""}</textarea>
+          <small style="color: #888;">Pega el texto del examen. La IA lo usará como fuente principal.</small>
         </div>
         <div class="form-group">
           <label>Preguntas interactivas (${questions.length} actuales)</label>
@@ -364,9 +369,14 @@ window.openModal = async function(type, editData = null, editId = null) {
           <textarea id="field-descripcion" placeholder="Descripción del examen...">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
+          <label>Contenido del examen (texto copiado del PDF)</label>
+          <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA podrá leer este contenido y generar preguntas similares.">${editData?.contenido_texto || ""}</textarea>
+          <small style="color: #888;">Pega el texto del examen. La IA lo usará para generar simulacros con el mismo estilo y nivel.</small>
+        </div>
+        <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-examen" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Selecciona varios archivos (PDF, JPG, PNG)</small>
+          <small style="color: #888;">El PDF original como respaldo. La IA lee el texto de arriba.</small>
           <div id="existing-examen-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -421,9 +431,14 @@ window.openModal = async function(type, editData = null, editId = null) {
           <textarea id="field-descripcion" placeholder="Describe el contenido del material... La IA usará esto como referencia para generar simulacros y tests.${editData?.universidad === 'UNI' ? ' Para IEN: sube exámenes pasados del IEN UNI.' : ''}">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
+          <label>Contenido del examen (texto copiado del PDF)</label>
+          <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA podrá leer este contenido y generar preguntas similares o extraer algunas directamente.">${editData?.contenido_texto || ""}</textarea>
+          <small style="color: #888;">Pega el texto del examen aquí. La IA lo usará como fuente principal para generar las 60 preguntas del simulacro IEN.</small>
+        </div>
+        <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-material" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Sube exámenes pasados, guías, preguntas tipo. La IA usará estos archivos como referencia.</small>
+          <small style="color: #888;">Sube el PDF original como respaldo. La IA lee el texto de arriba, no el PDF.</small>
           <div id="existing-material-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -558,6 +573,7 @@ async function saveItem() {
       data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
       data.preguntas = questions;
       data.universidad = document.getElementById("field-universidad").value;
+      data.contenido_texto = document.getElementById("field-contenido_texto")?.value || "";
       const fileInputSim = document.getElementById("field-archivos");
       if (fileInputSim?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputSim.files, BUCKET_MAP[currentType]);
@@ -587,6 +603,7 @@ async function saveItem() {
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
       data.universidad = document.getElementById("field-universidad").value;
+      data.contenido_texto = document.getElementById("field-contenido_texto")?.value || "";
       const fileInputEx = document.getElementById("field-archivos-examen");
       if (fileInputEx?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputEx.files, BUCKET_MAP[currentType]);
@@ -601,6 +618,7 @@ async function saveItem() {
       data.materia = document.getElementById("field-materia").value;
       data.descripcion = document.getElementById("field-descripcion").value;
       data.universidad = document.getElementById("field-universidad").value;
+      data.contenido_texto = document.getElementById("field-contenido_texto")?.value || "";
       const fileInputMat = document.getElementById("field-archivos-material");
       if (fileInputMat?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputMat.files, BUCKET_MAP[currentType]);

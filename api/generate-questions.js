@@ -78,13 +78,16 @@ Cada pregunta debe incluir "area" y "subtema".`
 
     systemPrompt = `Eres un experto creador de exámenes de admisión para la Universidad Nacional de Ingeniería (UNI) de Perú. Conoces perfectamente la estructura, nivel y estilo del Examen de Ingreso Escolar Nacional (IEN).
 
-MATERIALES DE REFERENCIA SUBIDOS POR EL ADMINISTRADOR:
-El administrador ha subido materiales de referencia (exámenes pasados, guías, preguntas tipo) que deben servirte como guía para el estilo, dificultad y tipo de preguntas a generar.
+IMPORTANTE: El administrador ha subido el CONTENIDO TEXTUAL de exámenes reales del IEN. Este contenido es tu FUENTE PRINCIPAL. Debes:
+1. EXTRAER preguntas directamente del contenido proporcionado cuando sea posible (cambiar números o datos para evitar copia exacta, pero manteniendo la estructura)
+2. GENERAR nuevas preguntas siguiendo el MISMO ESTILO, NIVEL DE DIFICULTAD y ESTRUCTURA del examen real
+3. Mantener la proporción de áreas: PE1 (33 preguntas), PE2 (13 preguntas), PE3 (14 preguntas)
+4. Usar 5 opciones (A-E) como el examen real IEN
+5. Los problemas matemáticos deben tener datos numéricos concretos
+6. Los textos de razonamiento verbal deben ser argumentativos/narrativos como el examen real
 
-${context || 'No hay materiales de referencia disponibles aún. Genera preguntas basándote en tu conocimiento del examen IEN UNI.'}
-
-INSTRUCCIONES:
-${config.prompt}
+CONTENIDO DE EXÁMENES REALES DEL IEN (proporcionado por el administrador):
+${context || 'No hay contenido de exámenes disponibles. Genera preguntas basándote en tu conocimiento del examen IEN UNI de nivel 5to de secundaria.'}
 
 FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 {
@@ -100,16 +103,19 @@ FORMATO JSON VÁLIDO (sin markdown, sin backticks):
   ]
 }
 
-REGLAS IMPORTANTES:
+ESTRUCTURA DEL EXAMEN IEN (60 preguntas total):
+- PE1 (33 preguntas): Razonamiento Matemático (12), Razonamiento Verbal (13), Humanidades (8)
+- PE2 (13 preguntas): Aritmética (3), Álgebra (4), Geometría (3), Trigonometría (3)
+- PE3 (14 preguntas): Física (7), Química (7)
+
+REGLAS:
 - Nivel: Estudiantes de 5to de secundaria (16-18 años)
-- El examen IEN usa 5 opciones (A-E), NO 4
+- El examen IEN usa 5 opciones (A-E)
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
 - Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
-- Si hay materiales de referencia del administrador, imita su estilo y nivel de dificultad
-- NO repitas conceptos entre preguntas
-- Preguntas tipo examen UNI: problemas con datos numéricos, interpretación de textos, análisis de situaciones
-- Cuando sea posible, genera preguntas similares a las encontradas en los materiales de referencia`;
+- SI HAY CONTENIDO DEL ADMINISTRADOR: extrae y adapta preguntas de ahí como fuente principal
+- NO repitas conceptos entre preguntas`;
   } else {
     config = { count: numQuestions, prompt: '' };
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
@@ -161,7 +167,7 @@ REGLAS:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Genera las ${config.count || numQuestions} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? 'IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas.' : ''}` }
         ],
-        max_tokens: 16384,
+        max_tokens: 32768,
         temperature: 0.8
       })
     });
