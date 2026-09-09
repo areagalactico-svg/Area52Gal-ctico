@@ -367,6 +367,7 @@
         let simulacroTimeLeft = 0;
         let simulacroCurrentTest = null;
         let simulacroAnswers = {};
+        let simulacroStartTime = null;
 
         async function fetchSimulacroContext(materia) {
             const ienMaterias = ['Matemática', 'Física', 'Química', 'Razonamiento Verbal', 'Razonamiento Matemático', 'Humanidades'];
@@ -428,21 +429,53 @@
         async function loadSimulacrosIEN() {
             const choices = document.getElementById("simulacro-choices");
             try {
-                const { data, error } = await supabase.from("simulacros_ien").select("*").eq("universidad", "UNI").order("fecha", { ascending: false });
+                const { data, error } = await supabase.from("simulacros_ien").select("*").eq("universidad", "UNI").eq("activo", true).order("fecha", { ascending: false });
                 if (error || !data || data.length === 0) {
-                    choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros guardados. Genera uno con IA:</p></div>';
+                    choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros disponibles. Genera uno con IA:</p></div>';
                 } else {
                     choices.innerHTML = "";
+                    const now = new Date();
                     data.forEach(item => {
                         const numPreg = item.preguntas?.length || 0;
                         const numArch = item.archivos?.length || 0;
                         if (numPreg === 0 && numArch === 0) return;
+
+                        const inicio = item.fecha_inicio ? new Date(item.fecha_inicio) : null;
+                        const duracionMin = item.duracion || 140;
+                        const fin = inicio ? new Date(inicio.getTime() + duracionMin * 60000) : null;
+
+                        let statusHtml = '';
+                        let canStart = false;
+                        if (!inicio) {
+                            statusHtml = '<span class="badge-tag">Sin fecha programada</span>';
+                            canStart = true;
+                        } else if (now < inicio) {
+                            const diff = inicio - now;
+                            const hours = Math.floor(diff / 3600000);
+                            const mins = Math.floor((diff % 3600000) / 60000);
+                            const days = Math.floor(hours / 24);
+                            let timeStr = '';
+                            if (days > 0) timeStr = `${days}dia${days > 1 ? 's' : ''}`;
+                            if (hours % 24 > 0) timeStr += ` ${hours % 24}h`;
+                            if (mins > 0) timeStr += ` ${mins}min`;
+                            statusHtml = `<span class="badge-tag" style="background:#cce5ff;color:#004085;">Inicia en ${timeStr.trim()}</span>`;
+                        } else if (fin && now > fin) {
+                            statusHtml = '<span class="badge-tag" style="background:#d4edda;color:#155724;">Finalizado</span>';
+                        } else {
+                            statusHtml = '<span class="badge-tag" style="background:#f8d7da;color:#721c24;">En curso</span>';
+                            canStart = true;
+                        }
+
                         const card = document.createElement("div");
                         card.className = "content-card";
-                        card.style.cursor = "pointer";
+                        card.style.cursor = canStart ? "pointer" : "not-allowed";
+                        card.style.opacity = canStart ? "1" : "0.7";
                         const archInfo = numArch > 0 ? ` | ${numArch} archivo${numArch > 1 ? 's' : ''}` : '';
-                        card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p><p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${item.duracion || 60} min</p>`;
-                        card.onclick = () => startSimulacroIEN(item);
+                        const durInfo = `${duracionMin} min`;
+                        card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p><p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${durInfo}</p><p>${statusHtml}</p>`;
+                        if (canStart) {
+                            card.onclick = () => startSimulacroIEN(item);
+                        }
                         choices.appendChild(card);
                     });
                     if (choices.children.length === 0) {
@@ -495,6 +528,7 @@
         function startSimulacroIEN(data) {
             simulacroCurrentTest = data;
             simulacroAnswers = {};
+            simulacroStartTime = new Date();
             document.getElementById("simulacro-list-area").style.display = "none";
             const testArea = document.getElementById("simulacro-test-area");
             testArea.style.display = "block";
@@ -514,7 +548,7 @@
             }
             if (!hasQuestions) return;
 
-            simulacroTimeLeft = (data.duracion || 60) * 60;
+            simulacroTimeLeft = (data.duracion || 140) * 60;
             document.getElementById("simulacro-timer").style.display = "block";
             startSimulacroTimer();
             renderSimulacroQuestions();
@@ -527,8 +561,11 @@
                 const s = (simulacroTimeLeft % 60).toString().padStart(2, "0");
                 const t = document.getElementById("simulacro-timer");
                 t.textContent = `${m}:${s}`;
-                if (simulacroTimeLeft <= 300) t.classList.add("warning");
-                if (simulacroTimeLeft <= 0) { clearInterval(simulacroTimer); alert("¡Tiempo agotado!"); submitSimulacroIEN(); }
+                if (simulacroTimeLeft <= 600) t.classList.add("warning");
+                if (simulacroTimeLeft === 600) {
+                    alert("Faltan 10 minutos. Revisa tus respuestas.");
+                }
+                if (simulacroTimeLeft <= 0) { clearInterval(simulacroTimer); alert("Tiempo agotado. El simulacro se enviara automaticamente."); submitSimulacroIEN(); }
             }, 1000);
         }
 
@@ -556,36 +593,91 @@
             document.querySelector(".simulacro-progress-fill").style.width = ((answered / total) * 100) + "%";
         };
 
-        window.submitSimulacroIEN = function() {
+        window.submitSimulacroIEN = async function() {
             clearInterval(simulacroTimer);
             document.getElementById("simulacro-timer").style.display = "none";
             const total = simulacroCurrentTest.preguntas.length;
             let correct = 0;
             const areaResults = {};
+            const details = [];
+
             simulacroCurrentTest.preguntas.forEach((q, qi) => {
-                const isCorrect = window.simulacroAnswers[qi] === q.respuestaCorrecta;
+                const selected = window.simulacroAnswers[qi];
+                const isCorrect = selected === q.respuestaCorrecta;
                 if (isCorrect) correct++;
                 if (q.area) {
                     if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, total: 0 };
                     areaResults[q.area].total++;
                     if (isCorrect) areaResults[q.area].correct++;
                 }
+                details.push({
+                    index: qi,
+                    texto: q.texto,
+                    opciones: q.opciones,
+                    selected: selected,
+                    correct: q.respuestaCorrecta,
+                    isCorrect: isCorrect,
+                    explicacion: q.explicacion || '',
+                    area: q.area || '',
+                    subtema: q.subtema || ''
+                });
             });
-            const pct = Math.round((correct / total) * 100);
-            const elapsed = (simulacroCurrentTest.duracion || 60) * 60 - simulacroTimeLeft;
-            const elapsedMin = Math.floor(elapsed / 60);
-            let msg = pct >= 80 ? "Excelente! Estás bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas áreas." : "Necesitas estudiar más. ¡No te rindas!";
 
+            const pct = Math.round((correct / total) * 100);
+            const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
+            const elapsedMin = Math.floor(elapsed / 60);
+            let msg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
+
+            // Guardar en BD
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const email = session?.user?.email || "anonimo";
+                await supabase.from("simulacro_submissions").upsert({
+                    simulacro_id: simulacroCurrentTest.id || null,
+                    estudiante_email: email,
+                    respuestas: window.simulacroAnswers,
+                    puntaje: correct,
+                    total_preguntas: total,
+                    porcentaje: pct,
+                    tiempo_segundos: elapsed,
+                    area_results: areaResults,
+                    fecha_inicio: simulacroStartTime?.toISOString(),
+                    fecha_fin: new Date().toISOString()
+                }, { onConflict: "simulacro_id,estudiante_email" });
+            } catch (e) { console.error("Error guardando submission:", e); }
+
+            // Resultados
             let breakdown = '';
             if (Object.keys(areaResults).length > 1) {
                 const colors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
-                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultados por Prueba:</h3>';
+                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultados por Prueba:</h3>';
                 for (const [name, d] of Object.entries(areaResults)) {
                     const p = Math.round((d.correct / d.total) * 100);
                     breakdown += `<div style="margin-bottom:0.8rem;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${colors[name] || '#333'};">${name}</span><span style="color:#ff6b6b;">${d.correct}/${d.total} (${p}%)</span></div><div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${p}%;background:${p >= 70 ? '#00c896' : p >= 50 ? '#f39c12' : '#e74c3c'};border-radius:4px;"></div></div></div>`;
                 }
                 breakdown += '</div>';
             }
+
+            // Solucionario completo
+            let solucionario = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Solucionario y Correccion</h3>';
+            details.forEach((d, i) => {
+                const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
+                const selectedText = d.selected !== undefined ? d.opciones[d.selected] : '<em>No respondida</em>';
+                const correctText = d.opciones[d.correct];
+                const areaColor = d.area === 'PE1' ? '#3498db' : d.area === 'PE2' ? '#e74c3c' : d.area === 'PE3' ? '#2ecc71' : '#ff6b6b';
+                solucionario += `
+                    <div style="background:${d.isCorrect ? '#f0faf7' : '#fff5f5'};border:1px solid ${d.isCorrect ? '#00c89633' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''}</span>
+                            ${icon}
+                        </div>
+                        <p style="margin-bottom:0.5rem;color:#333;">${d.texto}</p>
+                        <p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Tu respuesta:</strong> ${selectedText}</p>
+                        ${!d.isCorrect ? `<p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Respuesta correcta:</strong> ${correctText}</p>` : ''}
+                        ${d.explicacion ? `<p style="color:#666;font-size:0.85rem;margin-top:0.5rem;font-style:italic;">${d.explicacion}</p>` : ''}
+                    </div>`;
+            });
+            solucionario += '</div>';
 
             document.getElementById("simulacro-test-area").innerHTML = `
                 <div class="simulacro-result">
@@ -594,6 +686,7 @@
                     <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
                     ${breakdown}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${msg}</p>
+                    ${solucionario}
                     <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
                 </div>`;
         };

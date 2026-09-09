@@ -17,11 +17,13 @@ CREATE TABLE simulacros_ien (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   titulo TEXT NOT NULL,
   descripcion TEXT,
-  duracion INTEGER DEFAULT 60,
+  duracion INTEGER DEFAULT 140,
   universidad TEXT DEFAULT 'UNI',
   preguntas JSONB DEFAULT '[]',
   archivos JSONB DEFAULT '[]',
   contenido_texto TEXT DEFAULT '',
+  fecha_inicio TIMESTAMPTZ,
+  activo BOOLEAN DEFAULT true,
   fecha TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -87,6 +89,22 @@ CREATE TABLE newsletter (
   fecha TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Tabla: Respuestas de Simulacros (estudiantes)
+CREATE TABLE simulacro_submissions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  simulacro_id UUID REFERENCES simulacros_ien(id) ON DELETE CASCADE,
+  estudiante_email TEXT NOT NULL,
+  respuestas JSONB DEFAULT '{}',
+  puntaje INTEGER DEFAULT 0,
+  total_preguntas INTEGER DEFAULT 0,
+  porcentaje NUMERIC(5,2) DEFAULT 0,
+  tiempo_segundos INTEGER DEFAULT 0,
+  area_results JSONB DEFAULT '{}',
+  fecha_inicio TIMESTAMPTZ DEFAULT NOW(),
+  fecha_fin TIMESTAMPTZ,
+  UNIQUE(simulacro_id, estudiante_email)
+);
+
 -- ============================================
 -- Storage Buckets (ejecutar después)
 -- ============================================
@@ -101,10 +119,28 @@ INSERT INTO storage.buckets (id, name, public) VALUES
 --
 -- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
 -- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
+-- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS fecha_inicio TIMESTAMPTZ;
+-- ALTER TABLE simulacros_ien ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT true;
 -- ALTER TABLE examenes ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
 -- ALTER TABLE examenes ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
 -- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
 -- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
+--
+-- Crear tabla de submissions (si no existe):
+-- CREATE TABLE IF NOT EXISTS simulacro_submissions (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   simulacro_id UUID REFERENCES simulacros_ien(id) ON DELETE CASCADE,
+--   estudiante_email TEXT NOT NULL,
+--   respuestas JSONB DEFAULT '{}',
+--   puntaje INTEGER DEFAULT 0,
+--   total_preguntas INTEGER DEFAULT 0,
+--   porcentaje NUMERIC(5,2) DEFAULT 0,
+--   tiempo_segundos INTEGER DEFAULT 0,
+--   area_results JSONB DEFAULT '{}',
+--   fecha_inicio TIMESTAMPTZ DEFAULT NOW(),
+--   fecha_fin TIMESTAMPTZ,
+--   UNIQUE(simulacro_id, estudiante_email)
+-- );
 -- ============================================
 
 -- RLS (Row Level Security) Policies
@@ -113,6 +149,7 @@ INSERT INTO storage.buckets (id, name, public) VALUES
 -- Permitir lectura pública a todas las tablas
 ALTER TABLE test_vocacionales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE simulacros_ien ENABLE ROW LEVEL SECURITY;
+ALTER TABLE simulacro_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE videos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE temarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE examenes ENABLE ROW LEVEL SECURITY;
@@ -161,6 +198,12 @@ CREATE POLICY "Admin delete contactos" ON contactos FOR DELETE USING (auth.role(
 -- Newsletter: cualquiera puede insertar
 CREATE POLICY "Cualquiera insert newsletter" ON newsletter FOR INSERT WITH CHECK (true);
 CREATE POLICY "Admin select newsletter" ON newsletter FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Simulacro Submissions: estudiantes insertan/leen sus propios envíos, admin lee todos
+CREATE POLICY "Estudiante insert submissions" ON simulacro_submissions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Estudiante select own submissions" ON simulacro_submissions FOR SELECT USING (estudiante_email = auth.email());
+CREATE POLICY "Estudiante update own submissions" ON simulacro_submissions FOR UPDATE USING (estudiante_email = auth.email());
+CREATE POLICY "Admin select all submissions" ON simulacro_submissions FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Políticas de Storage
 CREATE POLICY "Lectura pública archivos" ON storage.objects FOR SELECT USING (bucket_id IN ('examenes', 'simulacros', 'materiales'));

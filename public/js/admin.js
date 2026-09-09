@@ -121,10 +121,35 @@ async function loadCollection(key) {
     const extra = item.universidad ? ` | ${item.universidad}` : (item.materia ? ` | ${item.materia}` : "");
     const filesCount = item.archivos?.length || 0;
     const filesInfo = filesCount > 0 ? ` | ${filesCount} archivo${filesCount > 1 ? 's' : ''}` : "";
+
+    let statusBadge = "";
+    if (key === "simulacros") {
+      const now = new Date();
+      const inicio = item.fecha_inicio ? new Date(item.fecha_inicio) : null;
+      const duracionMin = item.duracion || 140;
+      const fin = inicio ? new Date(inicio.getTime() + duracionMin * 60000) : null;
+      const pregCount = item.preguntas?.length || 0;
+
+      if (!item.activo) {
+        statusBadge = '<span style="display:inline-block;background:#f0f0f0;color:#888;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">Inactivo</span>';
+      } else if (!inicio) {
+        statusBadge = '<span style="display:inline-block;background:#fff3cd;color:#856404;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">Sin fecha</span>';
+      } else if (now < inicio) {
+        statusBadge = '<span style="display:inline-block;background:#cce5ff;color:#004085;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">Proximo</span>';
+      } else if (fin && now > fin) {
+        statusBadge = '<span style="display:inline-block;background:#d4edda;color:#155724;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">Finalizado</span>';
+      } else {
+        statusBadge = '<span style="display:inline-block;background:#f8d7da;color:#721c24;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">En curso</span>';
+      }
+      if (pregCount > 0) {
+        statusBadge += `<span style="display:inline-block;background:#e8f5e9;color:#2e7d32;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.3rem;">${pregCount} preguntas</span>`;
+      }
+    }
+
     div.innerHTML = `
       <div class="item-info">
         <h4>${item.titulo || item.nombre || "Sin título"}</h4>
-        <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}${extra}${filesInfo}</p>
+        <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}${extra}${filesInfo}${statusBadge}</p>
       </div>
       <div class="item-actions">
         <button class="btn btn-sm" onclick="editItem('${col.table}', '${item.id}', '${col.type}')">Editar</button>
@@ -205,6 +230,7 @@ window.openModal = async function(type, editData = null, editId = null) {
 
     case "simulacro":
       title.textContent = editData ? "Editar Simulacro" : "Nuevo Simulacro IEN";
+      const startDate = editData?.fecha_inicio ? new Date(editData.fecha_inicio).toISOString().slice(0, 16) : "";
       body.innerHTML = `
         <div class="form-group">
           <label>Universidad</label>
@@ -219,15 +245,26 @@ window.openModal = async function(type, editData = null, editId = null) {
         </div>
         <div class="form-group">
           <label>Título</label>
-          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Examen IEN UNI 2023">
+          <input type="text" id="field-titulo" value="${editData?.titulo || ""}" placeholder="Ej: Simulacro IEN UNI - Marzo 2026">
         </div>
         <div class="form-group">
           <label>Descripción</label>
           <textarea id="field-descripcion" placeholder="Describe el examen/simulacro...">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
+          <label>Fecha y hora de inicio (programación)</label>
+          <input type="datetime-local" id="field-fecha_inicio" value="${startDate}">
+          <small style="color: #888;">Los estudiantes solo podrán iniciar el examen a partir de esta fecha/hora.</small>
+        </div>
+        <div class="form-group">
           <label>Duración (minutos)</label>
-          <input type="number" id="field-duracion" value="${editData?.duracion || 60}" min="1">
+          <input type="number" id="field-duracion" value="${editData?.duracion || 140}" min="1">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="field-activo" ${editData?.activo !== false ? "checked" : ""}>
+            Activo (visible para estudiantes)
+          </label>
         </div>
         <div class="form-group">
           <label>Archivos del examen (PDF o imágenes)</label>
@@ -570,10 +607,12 @@ async function saveItem() {
     case "simulacro":
       data.titulo = document.getElementById("field-titulo").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      data.duracion = parseInt(document.getElementById("field-duracion").value) || 60;
+      data.duracion = parseInt(document.getElementById("field-duracion").value) || 140;
       data.preguntas = questions;
       data.universidad = document.getElementById("field-universidad").value;
       data.contenido_texto = document.getElementById("field-contenido_texto")?.value || "";
+      data.fecha_inicio = document.getElementById("field-fecha_inicio")?.value || null;
+      data.activo = document.getElementById("field-activo")?.checked ?? true;
       const fileInputSim = document.getElementById("field-archivos");
       if (fileInputSim?.files.length > 0) {
         const uploaded = await uploadFiles(fileInputSim.files, BUCKET_MAP[currentType]);
