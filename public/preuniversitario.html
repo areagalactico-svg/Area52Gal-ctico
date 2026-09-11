@@ -215,7 +215,30 @@
         <p>📱 WhatsApp: 933 884 059 • 📸 <a href="https://www.instagram.com/acad_area52/" target="_blank">@acad_area52</a></p>
     </footer>
 
+    <!-- Modal Login Estudiante -->
+    <div id="student-login-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:200; justify-content:center; align-items:center;">
+        <div style="background:white; border-radius:16px; padding:2.5rem; max-width:420px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.3); text-align:center;">
+            <h2 style="color:#1a1a2e; margin-bottom:0.5rem;">Acceder al Simulacro IEN</h2>
+            <p style="color:#888; margin-bottom:1.5rem; font-size:0.9rem;">Ingresa tus datos para participar del simulacro</p>
+            <div id="student-login-form">
+                <input type="email" id="student-email" placeholder="Tu correo electronico" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
+                <input type="password" id="student-password" placeholder="Contrasena (min 6 caracteres)" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:1rem; box-sizing:border-box;">
+                <button id="student-login-btn" onclick="studentLogin()" style="width:100%; padding:0.9rem; background:#ff6b6b; color:white; border:none; border-radius:8px; font-size:1.1rem; font-weight:bold; cursor:pointer; margin-bottom:0.8rem;">Iniciar Sesion</button>
+                <button id="student-register-btn" onclick="studentRegister()" style="width:100%; padding:0.9rem; background:white; color:#ff6b6b; border:2px solid #ff6b6b; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer; margin-bottom:0.8rem;">Crear Cuenta</button>
+            </div>
+            <div id="student-user-info" style="display:none;">
+                <p style="color:#333; margin-bottom:0.5rem;">Conectado como:</p>
+                <p id="student-email-display" style="font-weight:bold; color:#ff6b6b; font-size:1.1rem; margin-bottom:1rem;"></p>
+                <button onclick="studentLogout()" style="padding:0.6rem 1.5rem; background:white; color:#e74c3c; border:2px solid #e74c3c; border-radius:8px; font-weight:bold; cursor:pointer;">Cerrar sesion</button>
+            </div>
+            <p id="student-login-error" style="color:#e74c3c; margin-top:0.8rem; font-size:0.85rem; display:none;"></p>
+            <button onclick="closeStudentLogin()" style="margin-top:1rem; background:none; border:none; color:#888; cursor:pointer; font-size:0.9rem;">Cancelar</button>
+        </div>
+    </div>
+
     <script>
+        window._studentUser = null;
+
         window.selectUni = function(el) {
             document.querySelectorAll(".uni-card").forEach(c => c.classList.remove("active"));
             el.classList.add("active");
@@ -231,6 +254,13 @@
             if (window._filterAndRender) window._filterAndRender();
         };
         window.showTab = function(tab) {
+            if (tab === "simulacro") {
+                if (!window._studentUser) {
+                    document.getElementById("student-login-modal").style.display = "flex";
+                    checkStudentSession();
+                    return;
+                }
+            }
             document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
@@ -240,9 +270,130 @@
             if (tab === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
         };
         window._selectedUni = "UNI";
+
+        window.closeStudentLogin = function() {
+            document.getElementById("student-login-modal").style.display = "none";
+        };
+
+        window.studentLogin = async function() {
+            const email = document.getElementById("student-email").value.trim();
+            const password = document.getElementById("student-password").value;
+            const errorEl = document.getElementById("student-login-error");
+            errorEl.style.display = "none";
+
+            if (!email || !password) {
+                errorEl.textContent = "Ingresa tu correo y contrasena.";
+                errorEl.style.display = "block";
+                return;
+            }
+
+            const btn = document.getElementById("student-login-btn");
+            btn.disabled = true; btn.textContent = "Ingresando...";
+
+            try {
+                const { data, error } = await window._supabase.auth.signInWithPassword({ email, password });
+                if (error) {
+                    errorEl.textContent = error.message.includes("Invalid login") ? "Correo o contrasena incorrectos." : error.message;
+                    errorEl.style.display = "block";
+                } else {
+                    window._studentUser = data.user;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: data.user.email }));
+                    showStudentLogged();
+                    document.getElementById("student-login-modal").style.display = "none";
+                    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+                    document.querySelector('.tab-btn[data-tab="simulacro"]').classList.add("active");
+                    document.getElementById("tab-simulacro").classList.add("active");
+                    if (window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+                }
+            } catch(e) {
+                errorEl.textContent = "Error de conexion. Intenta de nuevo.";
+                errorEl.style.display = "block";
+            } finally { btn.disabled = false; btn.textContent = "Iniciar Sesion"; }
+        };
+
+        window.studentRegister = async function() {
+            const email = document.getElementById("student-email").value.trim();
+            const password = document.getElementById("student-password").value;
+            const errorEl = document.getElementById("student-login-error");
+            errorEl.style.display = "none";
+
+            if (!email || !password) {
+                errorEl.textContent = "Ingresa tu correo y contrasena.";
+                errorEl.style.display = "block";
+                return;
+            }
+            if (password.length < 6) {
+                errorEl.textContent = "La contrasena debe tener minimo 6 caracteres.";
+                errorEl.style.display = "block";
+                return;
+            }
+
+            const btn = document.getElementById("student-register-btn");
+            btn.disabled = true; btn.textContent = "Creando cuenta...";
+
+            try {
+                const { data, error } = await window._supabase.auth.signUp({ email, password });
+                if (error) {
+                    errorEl.textContent = error.message.includes("already") ? "Este correo ya esta registrado. Inicia sesion." : error.message;
+                    errorEl.style.display = "block";
+                } else {
+                    errorEl.style.color = "#00c896";
+                    errorEl.textContent = "Cuenta creada! Revisa tu correo para confirmar, o inicia sesion.";
+                    errorEl.style.display = "block";
+                    errorEl.style.color = "#00c896";
+                }
+            } catch(e) {
+                errorEl.textContent = "Error de conexion. Intenta de nuevo.";
+                errorEl.style.display = "block";
+            } finally { btn.disabled = false; btn.textContent = "Crear Cuenta"; }
+        };
+
+        window.studentLogout = async function() {
+            await window._supabase.auth.signOut();
+            window._studentUser = null;
+            localStorage.removeItem("area52_student");
+            document.getElementById("student-login-form").style.display = "block";
+            document.getElementById("student-user-info").style.display = "none";
+            location.reload();
+        };
+
+        function showStudentLogged() {
+            document.getElementById("student-login-form").style.display = "none";
+            document.getElementById("student-user-info").style.display = "block";
+            document.getElementById("student-email-display").textContent = window._studentUser.email;
+        }
+
+        async function checkStudentSession() {
+            const saved = localStorage.getItem("area52_student");
+            if (saved) {
+                try {
+                    const { data: { session } } = await window._supabase.auth.getSession();
+                    if (session && session.user.email === JSON.parse(saved).email) {
+                        window._studentUser = session.user;
+                        showStudentLogged();
+                        return;
+                    }
+                } catch(e) {}
+            }
+            document.getElementById("student-login-form").style.display = "block";
+            document.getElementById("student-user-info").style.display = "none";
+        }
+
+        async function initStudentSession() {
+            try {
+                const { data: { session } } = await window._supabase.auth.getSession();
+                if (session) {
+                    window._studentUser = session.user;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: session.user.email }));
+                }
+            } catch(e) {}
+        }
+        window.initStudentSession = initStudentSession;
     </script>
     <script type="module">
         import { supabase } from "/js/supabase-config.js";
+        window._supabase = supabase;
 
         let allTemarios = [];
         let allExamenes = [];
@@ -630,8 +781,13 @@
 
             // Guardar en BD
             try {
-                const { data: { session } } = await supabase.auth.getSession();
-                const email = session?.user?.email || "anonimo";
+                let email = "anonimo";
+                if (window._studentUser?.email) {
+                    email = window._studentUser.email;
+                } else {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    email = session?.user?.email || "anonimo";
+                }
                 await supabase.from("simulacro_submissions").upsert({
                     simulacro_id: simulacroCurrentTest.id || null,
                     estudiante_email: email,
@@ -695,6 +851,8 @@
             document.getElementById("tab-btn-simulacro").style.display = "inline-block";
             loadSimulacrosIEN();
         }
+
+        initStudentSession();
     </script>
     <script src="/js/chat.js"></script>
 </body>
