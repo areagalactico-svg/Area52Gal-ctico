@@ -841,6 +841,7 @@
             document.getElementById("simulacro-topbar").style.display = "none";
             const details = [];
             let puntajeTotal = 0;
+            let correct = 0;
             const areaResults = {};
 
             // Calificacion IEN real por area
@@ -864,6 +865,7 @@
                 let puntos = 0;
                 if (isCorrect) {
                     puntos = scoring.correct;
+                    correct++;
                 } else if (!isBlank) {
                     puntos = scoring.wrong;
                 }
