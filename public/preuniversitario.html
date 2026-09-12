@@ -891,7 +891,7 @@
             const pct = Math.round((puntajeTotal / maxPuntaje) * 100);
             const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
             const elapsedMin = Math.floor(elapsed / 60);
-            let msg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
+            const resultadoMsg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
 
             // Guardar en BD
             let nombre = window._studentNombre || "Sin nombre";
@@ -980,7 +980,7 @@
                     <h2 style="color:#ff6b6b;font-size:3rem;">${puntajeTotal.toFixed(2)} pts</h2>
                     <p style="font-size:1.2rem;color:#333;">${pct}% de calificacion | ${correct}/${total} correctas</p>
                     <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
-                    <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${msg}</p>
+                    <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>
                     ${breakdown}
                     ${leaderboardHtml}
                     ${solucionario}
