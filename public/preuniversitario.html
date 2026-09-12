@@ -595,6 +595,13 @@
                         const duracionMin = item.duracion || 140;
                         const fin = inicio ? new Date(inicio.getTime() + duracionMin * 60000) : null;
 
+                        let fechaHtml = '';
+                        if (inicio) {
+                            const dia = inicio.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                            const hora = inicio.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                            fechaHtml = `<p style="color:#1a1a2e;font-weight:600;margin:0.3rem 0;">📅 ${dia} a las ${hora}</p>`;
+                        }
+
                         let statusHtml = '';
                         let canStart = false;
                         if (!inicio) {
@@ -613,7 +620,7 @@
                         } else if (fin && now > fin) {
                             statusHtml = '<span class="badge-tag" style="background:#d4edda;color:#155724;">Finalizado</span>';
                         } else {
-                            statusHtml = '<span class="badge-tag" style="background:#f8d7da;color:#721c24;">En curso</span>';
+                            statusHtml = '<span class="badge-tag" style="background:#f8d7da;color:#721c24;">En curso - ¡Ahora puedes darlo!</span>';
                             canStart = true;
                         }
 
@@ -621,9 +628,13 @@
                         card.className = "content-card";
                         card.style.cursor = canStart ? "pointer" : "not-allowed";
                         card.style.opacity = canStart ? "1" : "0.7";
+                        if (canStart && inicio && now >= inicio) {
+                            card.style.borderLeft = "4px solid #00c896";
+                            card.style.background = "#f0faf7";
+                        }
                         const archInfo = numArch > 0 ? ` | ${numArch} archivo${numArch > 1 ? 's' : ''}` : '';
                         const durInfo = `${duracionMin} min`;
-                        card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p><p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${durInfo}</p><p>${statusHtml}</p>`;
+                        card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p>${fechaHtml}<p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${durInfo}</p><p>${statusHtml}</p>`;
                         if (canStart) {
                             card.onclick = () => startSimulacroIEN(item);
                         }
@@ -638,6 +649,13 @@
             }
             document.getElementById("simulacro-ai-section").style.display = "block";
         }
+
+        let _simulacroRefreshInterval = null;
+        window._loadSimulacrosIEN = function() {
+            if (_simulacroRefreshInterval) clearInterval(_simulacroRefreshInterval);
+            loadSimulacrosIEN();
+            _simulacroRefreshInterval = setInterval(loadSimulacrosIEN, 60000);
+        };
 
         window.generateIEN = async function() {
             const topic = document.getElementById('ai-topic').value;

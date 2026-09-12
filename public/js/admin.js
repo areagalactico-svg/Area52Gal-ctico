@@ -611,7 +611,7 @@ async function saveItem() {
       data.preguntas = questions;
       data.universidad = document.getElementById("field-universidad").value;
       data.contenido_texto = document.getElementById("field-contenido_texto")?.value || "";
-      data.fecha_inicio = document.getElementById("field-fecha_inicio")?.value || null;
+      data.fecha_inicio = document.getElementById("field-fecha_inicio")?.value ? new Date(document.getElementById("field-fecha_inicio").value).toISOString() : null;
       data.activo = document.getElementById("field-activo")?.checked ?? true;
       const fileInputSim = document.getElementById("field-archivos");
       if (fileInputSim?.files.length > 0) {
