@@ -65,6 +65,12 @@
         .download-link:hover { background: #ff6b6b; color: white; border-color: #ff6b6b; }
         .simulacro-timer { position: fixed; top: 70px; right: 20px; background: #1a1a2e; color: #00c896; padding: 0.8rem 1.5rem; border-radius: 50px; font-size: 1.2rem; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .simulacro-timer.warning { color: #e74c3c; animation: pulse 1s infinite; }
+        .simulacro-topbar { position: fixed; top: 60px; left: 0; right: 0; background: white; border-bottom: 2px solid #e0e0e0; padding: 0.6rem 2rem; display: none; justify-content: space-between; align-items: center; z-index: 99; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .simulacro-topbar .timer { font-size: 1.3rem; font-weight: bold; color: #1a1a2e; }
+        .simulacro-topbar .timer.warning { color: #e74c3c; }
+        .simulacro-topbar .info { color: #666; font-size: 0.9rem; }
+        .simulacro-topbar .btn-entregar { padding: 0.6rem 1.5rem; background: #ff6b6b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95rem; }
+        .simulacro-topbar .btn-entregar:hover { background: #e55555; }
         .simulacro-question { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
         .simulacro-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.3s; }
         .simulacro-option:hover { border-color: #ff6b6b; background: #fff5f5; }
@@ -159,6 +165,13 @@
 
             <div id="tab-simulacro" class="tab-content">
                 <div class="simulacro-timer" id="simulacro-timer" style="display: none;">00:00</div>
+                <div class="simulacro-topbar" id="simulacro-topbar">
+                    <div>
+                        <span class="info" id="topbar-progress">0/0 respondidas</span>
+                        <span class="timer" id="topbar-timer" style="margin-left:1rem;">00:00</span>
+                    </div>
+                    <button class="btn-entregar" onclick="submitSimulacroIEN()">Entregar Simulacro</button>
+                </div>
 
                 <div id="simulacro-list-area">
                     <div id="simulacro-choices"></div>
@@ -804,9 +817,18 @@
         };
 
         window.submitSimulacroIEN = async function() {
+            const answered = Object.keys(window.simulacroAnswers || {}).length;
+            const total = simulacroCurrentTest.preguntas.length;
+            const unanswered = total - answered;
+
+            let msg = "¿Entregar el simulacro ahora?";
+            if (unanswered > 0) {
+                msg = `Tienes ${unanswered} pregunta${unanswered > 1 ? 's' : ''} sin responder. ¿Entregar de todas formas?`;
+            }
+            if (!confirm(msg)) return;
+
             clearInterval(simulacroTimer);
             document.getElementById("simulacro-timer").style.display = "none";
-            const total = simulacroCurrentTest.preguntas.length;
             const details = [];
             let puntajeTotal = 0;
             const areaResults = {};
