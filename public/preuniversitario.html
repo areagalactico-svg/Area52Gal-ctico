@@ -778,13 +778,20 @@
         }
 
         function startSimulacroTimer() {
+            document.getElementById("simulacro-topbar").style.display = "flex";
             simulacroTimer = setInterval(() => {
                 simulacroTimeLeft--;
                 const m = Math.floor(simulacroTimeLeft / 60).toString().padStart(2, "0");
                 const s = (simulacroTimeLeft % 60).toString().padStart(2, "0");
+                const timeStr = `${m}:${s}`;
                 const t = document.getElementById("simulacro-timer");
-                t.textContent = `${m}:${s}`;
-                if (simulacroTimeLeft <= 600) t.classList.add("warning");
+                t.textContent = timeStr;
+                const topTimer = document.getElementById("topbar-timer");
+                topTimer.textContent = timeStr;
+                if (simulacroTimeLeft <= 600) {
+                    t.classList.add("warning");
+                    topTimer.classList.add("warning");
+                }
                 if (simulacroTimeLeft === 600) {
                     alert("Faltan 10 minutos. Revisa tus respuestas.");
                 }
@@ -814,6 +821,8 @@
             const total = simulacroCurrentTest.preguntas.length;
             const answered = Object.keys(window.simulacroAnswers).length;
             document.querySelector(".simulacro-progress-fill").style.width = ((answered / total) * 100) + "%";
+            const topProgress = document.getElementById("topbar-progress");
+            if (topProgress) topProgress.textContent = `${answered}/${total} respondidas`;
         };
 
         window.submitSimulacroIEN = async function() {
@@ -829,6 +838,7 @@
 
             clearInterval(simulacroTimer);
             document.getElementById("simulacro-timer").style.display = "none";
+            document.getElementById("simulacro-topbar").style.display = "none";
             const details = [];
             let puntajeTotal = 0;
             const areaResults = {};
