@@ -153,6 +153,7 @@ async function loadCollection(key) {
       </div>
       <div class="item-actions">
         ${key === "simulacros" && pregCount === 0 ? `<button class="btn btn-sm btn-generate" onclick="generateSimulacroQuestions('${item.id}')" style="background:#00c896;color:white;border-color:#00c896;">Generar preguntas IA</button>` : ''}
+        ${key === "simulacros" && pregCount > 0 ? `<button class="btn btn-sm" onclick="viewSimulacroResults('${item.id}')" style="background:#3498db;color:white;border-color:#3498db;">Ver Resultados</button>` : ''}
         <button class="btn btn-sm" onclick="editItem('${col.table}', '${item.id}', '${col.type}')">Editar</button>
         <button class="btn btn-sm btn-danger" onclick="deleteItem('${col.table}', '${item.id}')">Eliminar</button>
       </div>
@@ -488,7 +489,9 @@ window.openModal = async function(type, editData = null, editId = null) {
 };
 
 window.closeModal = function() {
+  document.getElementById("modal-overlay").style.display = "none";
   document.getElementById("modal-overlay").classList.remove("active");
+  document.getElementById("modal-save-btn").style.display = "inline-block";
   currentEditId = null;
   currentType = null;
   questions = [];
@@ -786,4 +789,135 @@ window.generateSimulacroQuestions = async function(simulacroId) {
     btn.disabled = false;
     btn.textContent = "Generar preguntas IA";
   }
+};
+
+window.viewSimulacroResults = async function(simulacroId) {
+  const overlay = document.getElementById("modal-overlay");
+  const title = document.getElementById("modal-title");
+  const body = document.getElementById("modal-body");
+  const saveBtn = document.getElementById("modal-save-btn");
+  saveBtn.style.display = "none";
+
+  title.textContent = "Resultados del Simulacro";
+  body.innerHTML = '<p style="color:#888; text-align:center;">Cargando resultados...</p>';
+  overlay.style.display = "flex";
+
+  try {
+    const { data: simulacro } = await supabase.from("simulacros_ien").select("titulo, preguntas").eq("id", simulacroId).single();
+    const { data: submissions } = await supabase.from("simulacro_submissions")
+      .select("*")
+      .eq("simulacro_id", simulacroId)
+      .order("puntaje", { ascending: false })
+      .order("tiempo_segundos", { ascending: true });
+
+    if (!submissions || submissions.length === 0) {
+      body.innerHTML = '<p style="color:#888; text-align:center; padding:2rem;">No hay resultados ainda. Ningun estudiante ha presentado este simulacro.</p>';
+      return;
+    }
+
+    const totalPreguntas = simulacro?.preguntas?.length || 65;
+
+    let html = `
+      <h3 style="color:#1a1a2e; margin-bottom:1rem;">${simulacro?.titulo || 'Simulacro'}</h3>
+      <p style="color:#666; margin-bottom:1.5rem;">${submissions.length} estudiante(s) presentaron este examen</p>
+      <div style="overflow-x: auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+          <thead>
+            <tr style="background:#1a1a2e; color:white;">
+              <th style="padding:0.7rem; text-align:left;">#</th>
+              <th style="padding:0.7rem; text-align:left;">Nombre</th>
+              <th style="padding:0.7rem; text-align:left;">WhatsApp</th>
+              <th style="padding:0.7rem; text-align:left;">Email</th>
+              <th style="padding:0.7rem; text-align:center;">Puntaje</th>
+              <th style="padding:0.7rem; text-align:center;">Correctas</th>
+              <th style="padding:0.7rem; text-align:center;">%</th>
+              <th style="padding:0.7rem; text-align:center;">Tiempo</th>
+              <th style="padding:0.7rem; text-align:center;">Accion</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    submissions.forEach((s, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const rowBg = i < 3 ? '#fff9e6' : (i % 2 === 0 ? '#f8f9fa' : 'white');
+      const mins = Math.floor((s.tiempo_segundos || 0) / 60);
+      const secs = (s.tiempo_segundos || 0) % 60;
+      const correctCount = s.area_results ? Object.values(s.area_results).reduce((sum, a) => sum + (a.correct || 0), 0) : 0;
+      html += `
+        <tr style="background:${rowBg}; border-bottom:1px solid #eee;">
+          <td style="padding:0.6rem; font-weight:bold;">${medal}</td>
+          <td style="padding:0.6rem; font-weight:600;">${s.nombre_completo || 'Sin nombre'}</td>
+          <td style="padding:0.6rem; color:#25d366;">${s.whatsapp || '-'}</td>
+          <td style="padding:0.6rem; color:#888; font-size:0.8rem;">${s.estudiante_email || '-'}</td>
+          <td style="padding:0.6rem; text-align:center; font-weight:bold; color:#ff6b6b; font-size:1rem;">${s.puntaje?.toFixed(2) || '0.00'}</td>
+          <td style="padding:0.6rem; text-align:center;">${correctCount}/${totalPreguntas}</td>
+          <td style="padding:0.6rem; text-align:center;">${s.porcentaje || 0}%</td>
+          <td style="padding:0.6rem; text-align:center;">${mins}:${String(secs).padStart(2,'0')}</td>
+          <td style="padding:0.6rem; text-align:center;"><button class="btn btn-sm" onclick="viewStudentDetail('${s.id}')" style="font-size:0.75rem;">Ver detalle</button></td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+
+    html += '<div style="margin-top:1.5rem; padding:1rem; background:#f8f9fa; border-radius:8px;"><h4 style="color:#1a1a2e; margin-bottom:0.5rem;">Resumen:</h4>';
+    const avgPuntaje = submissions.reduce((sum, s) => sum + (s.puntaje || 0), 0) / submissions.length;
+    const avgPct = submissions.reduce((sum, s) => sum + (s.porcentaje || 0), 0) / submissions.length;
+    const avgTiempo = submissions.reduce((sum, s) => sum + (s.tiempo_segundos || 0), 0) / submissions.length;
+    const avgMin = Math.floor(avgTiempo / 60);
+    html += `<p style="color:#666;">Puntaje promedio: <strong style="color:#ff6b6b;">${avgPuntaje.toFixed(2)} pts</strong> | Promedio general: <strong>${avgPct.toFixed(0)}%</strong> | Tiempo promedio: <strong>${avgMin} min</strong></p></div>`;
+
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<p style="color:#e74c3c; text-align:center;">Error al cargar: ${err.message}</p>`;
+  }
+};
+
+window.viewStudentDetail = async function(submissionId) {
+  const { data: sub } = await supabase.from("simulacro_submissions").select("*").eq("id", submissionId).single();
+  if (!sub) { alert("No se encontro el registro"); return; }
+
+  const { data: simulacro } = await supabase.from("simulacros_ien").select("preguntas").eq("id", sub.simulacro_id).single();
+  const preguntas = simulacro?.preguntas || [];
+  const respuestas = sub.respuestas || {};
+  const areaResults = sub.area_results || {};
+
+  let html = `
+    <div style="margin-bottom:1rem;">
+      <h3 style="color:#1a1a2e;">${sub.nombre_completo || 'Sin nombre'}</h3>
+      <p style="color:#888;">${sub.estudiante_email} | WhatsApp: ${sub.whatsapp || '-'}</p>
+      <p style="color:#ff6b6b; font-weight:bold; font-size:1.3rem;">${sub.puntaje?.toFixed(2) || 0} pts | ${sub.porcentaje || 0}%</p>
+    </div>`;
+
+  if (Object.keys(areaResults).length > 0) {
+    html += '<div style="margin-bottom:1rem;"><h4>Por Area:</h4>';
+    for (const [area, d] of Object.entries(areaResults)) {
+      html += `<p style="color:#666;"><strong>${area}:</strong> Correctas: ${d.correct} | Erradas: ${d.wrong} | Blanco: ${d.blank} | Puntaje: ${d.puntos?.toFixed(2) || 0}</p>`;
+    }
+    html += '</div>';
+  }
+
+  html += '<div style="max-height:400px; overflow-y:auto;">';
+  preguntas.forEach((q, i) => {
+    const selected = respuestas[i];
+    const isCorrect = selected === q.respuestaCorrecta;
+    const isBlank = selected === undefined || selected === null;
+    const bg = isCorrect ? '#f0faf7' : isBlank ? '#fffbf0' : '#fff5f5';
+    const border = isCorrect ? '#00c89633' : isBlank ? '#f39c1233' : '#e74c3c33';
+    const icon = isCorrect ? '✅' : isBlank ? '⬜' : '❌';
+    html += `
+      <div style="background:${bg}; border:1px solid ${border}; border-radius:6px; padding:0.7rem; margin-bottom:0.5rem; font-size:0.85rem;">
+        <span>${icon} <strong>${i+1}.</strong> ${q.texto?.substring(0, 80)}${q.texto?.length > 80 ? '...' : ''}</span>
+        ${!isCorrect ? `<span style="color:#e74c3c;"> → Correcta: ${q.opciones?.[q.respuestaCorrecta] || ''}</span>` : ''}
+      </div>`;
+  });
+  html += '</div>';
+
+  const overlay = document.getElementById("modal-overlay");
+  const title = document.getElementById("modal-title");
+  const body = document.getElementById("modal-body");
+  const saveBtn = document.getElementById("modal-save-btn");
+  saveBtn.style.display = "none";
+  title.textContent = "Detalle del Estudiante";
+  body.innerHTML = html;
+  overlay.style.display = "flex";
 };
