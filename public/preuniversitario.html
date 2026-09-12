@@ -144,7 +144,7 @@
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="temarios" onclick="showTab('temarios')">📚 Temarios</button>
                 <button class="tab-btn" data-tab="examenes" onclick="showTab('examenes')">📝 Exámenes</button>
-                <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" style="display: none;" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
+                <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
                 <button class="tab-btn" data-tab="materiales" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
@@ -634,7 +634,7 @@
         async function loadSimulacrosIEN() {
             const choices = document.getElementById("simulacro-choices");
             try {
-                const { data, error } = await supabase.from("simulacros_ien").select("*").eq("universidad", "UNI").eq("activo", true).order("fecha", { ascending: false });
+                const { data, error } = await supabase.from("simulacros_ien").select("*").eq("universidad", "UNI").or("activo.is.null,activo.eq.true").order("fecha", { ascending: false });
                 if (error || !data || data.length === 0) {
                     choices.innerHTML = '<div class="content-card"><p style="text-align: center; color: #888;">No hay simulacros disponibles. Genera uno con IA:</p></div>';
                 } else {
