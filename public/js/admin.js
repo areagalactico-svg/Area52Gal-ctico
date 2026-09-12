@@ -123,12 +123,12 @@ async function loadCollection(key) {
     const filesInfo = filesCount > 0 ? ` | ${filesCount} archivo${filesCount > 1 ? 's' : ''}` : "";
 
     let statusBadge = "";
+    const pregCount = item.preguntas?.length || 0;
     if (key === "simulacros") {
       const now = new Date();
       const inicio = item.fecha_inicio ? new Date(item.fecha_inicio) : null;
       const duracionMin = item.duracion || 140;
       const fin = inicio ? new Date(inicio.getTime() + duracionMin * 60000) : null;
-      const pregCount = item.preguntas?.length || 0;
 
       if (!item.activo) {
         statusBadge = '<span style="display:inline-block;background:#f0f0f0;color:#888;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.75rem;margin-left:0.5rem;">Inactivo</span>';
