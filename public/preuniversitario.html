@@ -222,6 +222,7 @@
             <p style="color:#888; margin-bottom:1.5rem; font-size:0.9rem;">Ingresa tus datos para participar del simulacro</p>
             <div id="student-login-form">
                 <input type="text" id="student-nombre" placeholder="Nombre completo" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
+                <input type="tel" id="student-whatsapp" placeholder="Numero de WhatsApp (ej: 933884059)" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
                 <input type="email" id="student-email" placeholder="Tu correo electronico" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
                 <input type="password" id="student-password" placeholder="Contrasena (min 6 caracteres)" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:1rem; box-sizing:border-box;">
                 <button id="student-login-btn" onclick="studentLogin()" style="width:100%; padding:0.9rem; background:#ff6b6b; color:white; border:none; border-radius:8px; font-size:1.1rem; font-weight:bold; cursor:pointer; margin-bottom:0.8rem;">Iniciar Sesion</button>
@@ -281,11 +282,17 @@
             const email = document.getElementById("student-email").value.trim();
             const password = document.getElementById("student-password").value;
             const nombre = document.getElementById("student-nombre").value.trim();
+            const whatsapp = document.getElementById("student-whatsapp").value.trim();
             const errorEl = document.getElementById("student-login-error");
             errorEl.style.display = "none";
 
             if (!nombre) {
                 errorEl.textContent = "Ingresa tu nombre completo.";
+                errorEl.style.display = "block";
+                return;
+            }
+            if (!whatsapp) {
+                errorEl.textContent = "Ingresa tu numero de WhatsApp.";
                 errorEl.style.display = "block";
                 return;
             }
@@ -306,7 +313,8 @@
                 } else {
                     window._studentUser = data.user;
                     window._studentNombre = nombre;
-                    localStorage.setItem("area52_student", JSON.stringify({ email: data.user.email, nombre: nombre }));
+                    window._studentWhatsapp = whatsapp;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: data.user.email, nombre: nombre, whatsapp: whatsapp }));
                     showStudentLogged();
                     document.getElementById("student-login-modal").style.display = "none";
                     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -325,11 +333,17 @@
             const email = document.getElementById("student-email").value.trim();
             const password = document.getElementById("student-password").value;
             const nombre = document.getElementById("student-nombre").value.trim();
+            const whatsapp = document.getElementById("student-whatsapp").value.trim();
             const errorEl = document.getElementById("student-login-error");
             errorEl.style.display = "none";
 
             if (!nombre) {
                 errorEl.textContent = "Ingresa tu nombre completo.";
+                errorEl.style.display = "block";
+                return;
+            }
+            if (!whatsapp) {
+                errorEl.textContent = "Ingresa tu numero de WhatsApp.";
                 errorEl.style.display = "block";
                 return;
             }
@@ -348,13 +362,14 @@
             btn.disabled = true; btn.textContent = "Creando cuenta...";
 
             try {
-                const { data, error } = await window._supabase.auth.signUp({ email, password, options: { data: { full_name: nombre } } });
+                const { data, error } = await window._supabase.auth.signUp({ email, password, options: { data: { full_name: nombre, whatsapp: whatsapp } } });
                 if (error) {
                     errorEl.textContent = error.message.includes("already") ? "Este correo ya esta registrado. Inicia sesion." : error.message;
                     errorEl.style.display = "block";
                 } else {
                     window._studentNombre = nombre;
-                    localStorage.setItem("area52_student", JSON.stringify({ email: email, nombre: nombre }));
+                    window._studentWhatsapp = whatsapp;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: email, nombre: nombre, whatsapp: whatsapp }));
                     errorEl.textContent = "Cuenta creada! Ya puedes iniciar sesion.";
                     errorEl.style.display = "block";
                     errorEl.style.color = "#00c896";
@@ -390,6 +405,7 @@
                     if (session && session.user.email === parsed.email) {
                         window._studentUser = session.user;
                         window._studentNombre = parsed.nombre || session.user.user_metadata?.full_name || "";
+                        window._studentWhatsapp = parsed.whatsapp || session.user.user_metadata?.whatsapp || "";
                         showStudentLogged();
                         return;
                     }
@@ -408,7 +424,8 @@
                     if (session) {
                         window._studentUser = session.user;
                         window._studentNombre = parsed.nombre || session.user.user_metadata?.full_name || "";
-                        localStorage.setItem("area52_student", JSON.stringify({ email: session.user.email, nombre: window._studentNombre }));
+                        window._studentWhatsapp = parsed.whatsapp || session.user.user_metadata?.whatsapp || "";
+                        localStorage.setItem("area52_student", JSON.stringify({ email: session.user.email, nombre: window._studentNombre, whatsapp: window._studentWhatsapp }));
                     }
                 }
             } catch(e) {}
@@ -846,6 +863,7 @@
 
             // Guardar en BD
             let nombre = window._studentNombre || "Sin nombre";
+            let whatsapp = window._studentWhatsapp || "";
             let email = "anonimo";
             try {
                 if (window._studentUser?.email) {
@@ -858,6 +876,7 @@
                     simulacro_id: simulacroCurrentTest.id || null,
                     estudiante_email: email,
                     nombre_completo: nombre,
+                    whatsapp: whatsapp,
                     respuestas: window.simulacroAnswers,
                     puntaje: Math.round(puntajeTotal * 100) / 100,
                     total_preguntas: total,
@@ -886,18 +905,18 @@
             let leaderboardHtml = '';
             try {
                 const { data: subs } = await supabase.from("simulacro_submissions")
-                    .select("nombre_completo, puntaje, porcentaje, tiempo_segundos")
+                    .select("nombre_completo, whatsapp, puntaje, porcentaje, tiempo_segundos")
                     .eq("simulacro_id", simulacroCurrentTest.id)
                     .order("puntaje", { ascending: false })
                     .order("tiempo_segundos", { ascending: true });
                 if (subs && subs.length > 0) {
-                    leaderboardHtml = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">🏆 Tabla de Puestos</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1a1a2e;color:white;"><th style="padding:0.7rem;text-align:left;">#</th><th style="padding:0.7rem;text-align:left;">Nombre</th><th style="padding:0.7rem;text-align:center;">Puntaje</th><th style="padding:0.7rem;text-align:center;">%</th><th style="padding:0.7rem;text-align:center;">Tiempo</th></tr></thead><tbody>';
+                    leaderboardHtml = '<div style="margin:2rem 0;text-align:left;max-width:800px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">🏆 Tabla de Puestos</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1a1a2e;color:white;"><th style="padding:0.7rem;text-align:left;">#</th><th style="padding:0.7rem;text-align:left;">Nombre</th><th style="padding:0.7rem;text-align:left;">WhatsApp</th><th style="padding:0.7rem;text-align:center;">Puntaje</th><th style="padding:0.7rem;text-align:center;">%</th><th style="padding:0.7rem;text-align:center;">Tiempo</th></tr></thead><tbody>';
                     subs.forEach((s, i) => {
                         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
                         const rowBg = i < 3 ? '#fff9e6' : (i % 2 === 0 ? '#f8f9fa' : 'white');
                         const mins = Math.floor((s.tiempo_segundos || 0) / 60);
                         const secs = (s.tiempo_segundos || 0) % 60;
-                        leaderboardHtml += `<tr style="background:${rowBg};border-bottom:1px solid #eee;"><td style="padding:0.6rem;font-weight:bold;">${medal}</td><td style="padding:0.6rem;">${s.nombre_completo || 'Sin nombre'}</td><td style="padding:0.6rem;text-align:center;font-weight:bold;color:#ff6b6b;">${s.puntaje?.toFixed(2) || '0.00'}</td><td style="padding:0.6rem;text-align:center;">${s.porcentaje || 0}%</td><td style="padding:0.6rem;text-align:center;">${mins}:${String(secs).padStart(2,'0')}</td></tr>`;
+                        leaderboardHtml += `<tr style="background:${rowBg};border-bottom:1px solid #eee;"><td style="padding:0.6rem;font-weight:bold;">${medal}</td><td style="padding:0.6rem;">${s.nombre_completo || 'Sin nombre'}</td><td style="padding:0.6rem;color:#25d366;">${s.whatsapp || '-'}</td><td style="padding:0.6rem;text-align:center;font-weight:bold;color:#ff6b6b;">${s.puntaje?.toFixed(2) || '0.00'}</td><td style="padding:0.6rem;text-align:center;">${s.porcentaje || 0}%</td><td style="padding:0.6rem;text-align:center;">${mins}:${String(secs).padStart(2,'0')}</td></tr>`;
                     });
                     leaderboardHtml += '</tbody></table></div>';
                 }

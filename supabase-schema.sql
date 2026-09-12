@@ -95,6 +95,7 @@ CREATE TABLE simulacro_submissions (
   simulacro_id UUID REFERENCES simulacros_ien(id) ON DELETE CASCADE,
   estudiante_email TEXT NOT NULL,
   nombre_completo TEXT NOT NULL DEFAULT '',
+  whatsapp TEXT DEFAULT '',
   respuestas JSONB DEFAULT '{}',
   puntaje NUMERIC(10,2) DEFAULT 0,
   total_preguntas INTEGER DEFAULT 0,
@@ -126,6 +127,9 @@ INSERT INTO storage.buckets (id, name, public) VALUES
 -- ALTER TABLE examenes ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
 -- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS universidad TEXT DEFAULT 'UNI';
 -- ALTER TABLE materiales_referencia ADD COLUMN IF NOT EXISTS contenido_texto TEXT DEFAULT '';
+-- ALTER TABLE simulacro_submissions ADD COLUMN IF NOT EXISTS nombre_completo TEXT NOT NULL DEFAULT '';
+-- ALTER TABLE simulacro_submissions ADD COLUMN IF NOT EXISTS whatsapp TEXT DEFAULT '';
+-- ALTER TABLE simulacro_submissions ALTER COLUMN puntaje TYPE NUMERIC(10,2);
 --
 -- Crear tabla de submissions (si no existe):
 -- CREATE TABLE IF NOT EXISTS simulacro_submissions (
