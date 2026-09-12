@@ -630,7 +630,7 @@
                     data.forEach(item => {
                         const numPreg = item.preguntas?.length || 0;
                         const numArch = item.archivos?.length || 0;
-                        if (numPreg === 0 && numArch === 0) return;
+                        if (numPreg === 0) return;
 
                         const inicio = item.fecha_inicio ? new Date(item.fecha_inicio) : null;
                         const duracionMin = item.duracion || 140;

@@ -152,6 +152,7 @@ async function loadCollection(key) {
         <p>${item.descripcion || item.materia || item.categoria || item.curso || ""}${extra}${filesInfo}${statusBadge}</p>
       </div>
       <div class="item-actions">
+        ${key === "simulacros" && pregCount === 0 ? `<button class="btn btn-sm btn-generate" onclick="generateSimulacroQuestions('${item.id}')" style="background:#00c896;color:white;border-color:#00c896;">Generar preguntas IA</button>` : ''}
         <button class="btn btn-sm" onclick="editItem('${col.table}', '${item.id}', '${col.type}')">Editar</button>
         <button class="btn btn-sm btn-danger" onclick="deleteItem('${col.table}', '${item.id}')">Eliminar</button>
       </div>
@@ -699,5 +700,90 @@ window.deleteItem = async function(table, id) {
     alert("Eliminado correctamente");
   } else {
     alert("Error al eliminar: " + error.message);
+  }
+};
+
+window.generateSimulacroQuestions = async function(simulacroId) {
+  if (!confirm("Se generaran 65 preguntas con IA para este simulacro. Continuar?")) return;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Generando...";
+
+  try {
+    const { data: simulacro, error: fetchError } = await supabase
+      .from("simulacros_ien")
+      .select("*")
+      .eq("id", simulacroId)
+      .single();
+
+    if (fetchError || !simulacro) {
+      alert("Error al cargar el simulacro");
+      return;
+    }
+
+    let context = "";
+    if (simulacro.contenido_texto) {
+      context = simulacro.contenido_texto;
+    }
+
+    try {
+      const { data: materiales } = await supabase.from("materiales_referencia")
+        .select("titulo, contenido_texto")
+        .eq("universidad", "UNI");
+      if (materiales && materiales.length > 0) {
+        materiales.forEach(m => {
+          if (m.contenido_texto) context += `\n\n=== MATERIAL: ${m.titulo} ===\n${m.contenido_texto}`;
+        });
+      }
+    } catch(e) {}
+
+    try {
+      const { data: examenes } = await supabase.from("examenes")
+        .select("titulo, contenido_texto")
+        .eq("universidad", "UNI");
+      if (examenes && examenes.length > 0) {
+        examenes.forEach(e => {
+          if (e.contenido_texto) context += `\n\n=== EXAMEN: ${e.titulo} ===\n${e.contenido_texto}`;
+        });
+      }
+    } catch(e) {}
+
+    const res = await fetch("/api/generate-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: "Examen Completo IEN",
+        type: "simulacro",
+        count: 65,
+        context: context
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.preguntas && data.preguntas.length > 0) {
+      const { error: updateError } = await supabase
+        .from("simulacros_ien")
+        .update({
+          preguntas: data.preguntas,
+          duracion: 180
+        })
+        .eq("id", simulacroId);
+
+      if (updateError) {
+        alert("Error al guardar las preguntas: " + updateError.message);
+      } else {
+        alert(`Se generaron ${data.preguntas.length} preguntas correctamente!`);
+        loadAllData();
+      }
+    } else {
+      alert("La IA no pudo generar las preguntas. Intenta de nuevo.");
+    }
+  } catch (err) {
+    alert("Error de conexion: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generar preguntas IA";
   }
 };
