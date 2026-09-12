@@ -35,19 +35,25 @@ module.exports = async function handler(req, res) {
   if (type === 'simulacro') {
     const topicConfigs = {
       'Examen Completo IEN': {
-        count: 60,
-        prompt: `Genera un EXAMEN COMPLETO del IEN UNI con 60 preguntas distribuidas EXACTAMENTE así:
-- PE1 (33 preguntas): Razonamiento Matemático (12), Razonamiento Verbal (13), Humanidades (8)
-- PE2 (13 preguntas): Matemática - Aritmética (3), Álgebra (4), Geometría (3), Trigonometría (3)
-- PE3 (14 preguntas): Física (7), Química (7)
-Cada pregunta debe incluir el campo "area" indicando a qué prueba pertenece (PE1, PE2 o PE3) y el subtema específico.`
+        count: 65,
+        prompt: `Genera un EXAMEN COMPLETO del IEN UNI con 65 preguntas distribuidas EXACTAMENTE así:
+- Parte I: Aptitud Académica (35 preguntas) → usar area="PE1"
+  * Razonamiento Matemático (12): sucesiones, figuras, conteo, lógica
+  * Razonamiento Verbal (13): comprensión lectora, analogías, ortografía
+  * Humanidades (10): Comunicación, Historia, Geografía, Economía, Filosofía, Ambiente
+- Parte II: Conocimientos (30 preguntas) → usar area="PE2" para Mat/Fís/Quím, area="PE3" para Humanidades
+  * Matemática (10): Aritmética (3), Álgebra (4), Geometría (3)
+  * Física (7): Cinemática, dinámica, electricidad, ondas, óptica
+  * Química (7): Estructura atómica, enlaces, estequiometría, reacciones
+  * Humanidades y Cultura General (6): Literatura, Historia, Geografía
+Cada pregunta debe incluir "area" (PE1/PE2/PE3) y "subtema".`
       },
       'PE1 - Aptitud Académica y Humanidades': {
-        count: 33,
-        prompt: `Genera la PE1 del IEN UNI - Aptitud Académica y Humanidades (33 preguntas):
+        count: 35,
+        prompt: `Genera la PE1 del IEN UNI - Aptitud Académica y Humanidades (35 preguntas):
 - Razonamiento Matemático (12 preguntas): Sucesiones numéricas, análisis de figuras, conteo, lógica proposicional, juegos lógicos
 - Razonamiento Verbal (13 preguntas): Comprensión lectora, analogías verbales, significado de palabras en contexto, ortografía
-- Humanidades (8 preguntas): Comunicación, Lengua, Literatura, Historia del Perú y del Mundo, Geografía, Economía, Filosofía, Lógica, Ambiente
+- Humanidades (10 preguntas): Comunicación, Lengua, Literatura, Historia del Perú y del Mundo, Geografía, Economía, Filosofía, Lógica, Ambiente
 Cada pregunta debe incluir "area" y "subtema".`
       },
       'PE2 - Matemática': {
@@ -60,10 +66,11 @@ Cada pregunta debe incluir "area" y "subtema".`
 Cada pregunta debe incluir "area" y "subtema".`
       },
       'PE3 - Física y Química': {
-        count: 14,
-        prompt: `Genera la PE3 del IEN UNI - Física y Química (14 preguntas):
+        count: 17,
+        prompt: `Genera la PE3 del IEN UNI - Física y Química (17 preguntas):
 - Física (7): Cinemática, dinámica, trabajo y energía, estática, hidrostática, termodinámica, electricidad, magnetismo, ondas, óptica, física moderna
 - Química (7): Estructura atómica, tabla periódica, enlaces químicos, estequiometría, reacciones químicas, química orgánica básica
+- Humanidades y Cultura General (4): Literatura, Historia del Perú, Geografía, Economía
 Cada pregunta debe incluir "area" y "subtema".`
       },
       'Razonamiento Matemático': { count: 12, prompt: `Genera 12 preguntas de Razonamiento Matemático del IEN UNI: sucesiones numéricas, análisis de figuras (series, analogías, distribución en filas y columnas, figuras discordantes), análisis de sólidos (vistas, despliegues), conteo de figuras geométricas, conteo de rutas, conteo de cubos, lógica proposicional, inferencias, juegos lógicos.` },
@@ -78,16 +85,16 @@ Cada pregunta debe incluir "area" y "subtema".`
 
     systemPrompt = `Eres un experto creador de exámenes de admisión para la Universidad Nacional de Ingeniería (UNI) de Perú. Conoces perfectamente la estructura, nivel y estilo del Examen de Ingreso Escolar Nacional (IEN).
 
-IMPORTANTE: El administrador ha subido el CONTENIDO TEXTUAL de exámenes reales del IEN. Este contenido es tu FUENTE PRINCIPAL. Debes:
-1. EXTRAER preguntas directamente del contenido proporcionado cuando sea posible (cambiar números o datos para evitar copia exacta, pero manteniendo la estructura)
+IMPORTANTE: El administrador ha subido un ARCHIVO/GUÍA del examen IEN. Este archivo es tu FUENTE PRINCIPAL de referencia. Debes:
+1. EXTRAER preguntas del estilo y nivel del contenido proporcionado
 2. GENERAR nuevas preguntas siguiendo el MISMO ESTILO, NIVEL DE DIFICULTAD y ESTRUCTURA del examen real
-3. Mantener la proporción de áreas: PE1 (33 preguntas), PE2 (13 preguntas), PE3 (14 preguntas)
+3. Mantener la proporción: Parte I (35 preguntas Aptitud Académica) + Parte II (30 preguntas Conocimientos)
 4. Usar 5 opciones (A-E) como el examen real IEN
 5. Los problemas matemáticos deben tener datos numéricos concretos
 6. Los textos de razonamiento verbal deben ser argumentativos/narrativos como el examen real
 
-CONTENIDO DE EXÁMENES REALES DEL IEN (proporcionado por el administrador):
-${context || 'No hay contenido de exámenes disponibles. Genera preguntas basándote en tu conocimiento del examen IEN UNI de nivel 5to de secundaria.'}
+CONTENIDO/GUÍA DEL EXAMEN IEN (proporcionado por el administrador):
+${context || 'No hay contenido de guía disponible. Genera preguntas basándote en tu conocimiento del examen IEN UNI de nivel 5to de secundaria.'}
 
 FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 {
@@ -103,10 +110,16 @@ FORMATO JSON VÁLIDO (sin markdown, sin backticks):
   ]
 }
 
-ESTRUCTURA DEL EXAMEN IEN (60 preguntas total):
-- PE1 (33 preguntas): Razonamiento Matemático (12), Razonamiento Verbal (13), Humanidades (8)
-- PE2 (13 preguntas): Aritmética (3), Álgebra (4), Geometría (3), Trigonometría (3)
-- PE3 (14 preguntas): Física (7), Química (7)
+ESTRUCTURA DEL EXAMEN IEN (65 preguntas total, 3 horas):
+- Parte I: Aptitud Académica (35 preguntas) → area="PE1"
+  * Razonamiento Matemático (12): sucesiones, figuras, conteo, lógica
+  * Razonamiento Verbal (13): comprensión lectora, analogías, ortografía
+  * Humanidades (10): Comunicación, Historia, Geografía, Economía, Filosofía
+- Parte II: Conocimientos (30 preguntas) → area="PE2" o "PE3"
+  * Matemática (10): Aritmética (3), Álgebra (4), Geometría (3)
+  * Física (7): Cinemática, dinámica, electricidad, ondas, óptica
+  * Química (7): Estructura atómica, enlaces, estequiometría, reacciones
+  * Humanidades y Cultura General (6): Literatura, Historia, Geografía
 
 REGLAS:
 - Nivel: Estudiantes de 5to de secundaria (16-18 años)
@@ -114,7 +127,7 @@ REGLAS:
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
 - Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
-- SI HAY CONTENIDO DEL ADMINISTRADOR: extrae y adapta preguntas de ahí como fuente principal
+- SI HAY GUÍA DEL ADMINISTRADOR: usa el estilo y nivel de dificultad como referencia
 - NO repitas conceptos entre preguntas`;
   } else {
     config = { count: numQuestions, prompt: '' };

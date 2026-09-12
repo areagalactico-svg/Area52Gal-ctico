@@ -168,10 +168,10 @@
                             <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Genera preguntas del examen de ingreso a la UNI por área o examen completo:</p>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
                                 <select id="ai-topic" style="flex: 1; min-width: 200px; padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem;">
-                                    <option value="Examen Completo IEN">Examen Completo IEN (60 preguntas - 2h 45min)</option>
-                                    <option value="PE1 - Aptitud Académica y Humanidades">PE1 - Aptitud Académica y Humanidades (33 preguntas)</option>
+                                    <option value="Examen Completo IEN">Examen Completo IEN (65 preguntas - 3 horas)</option>
+                                    <option value="PE1 - Aptitud Académica y Humanidades">PE1 - Aptitud Académica y Humanidades (35 preguntas)</option>
                                     <option value="PE2 - Matemática">PE2 - Matemática (13 preguntas)</option>
-                                    <option value="PE3 - Física y Química">PE3 - Física y Química (14 preguntas)</option>
+                                    <option value="PE3 - Física y Química">PE3 - Física y Química (17 preguntas)</option>
                                     <option disabled style="background: #f0f0f0;">─── Subtemas ───</option>
                                     <option value="Razonamiento Matemático">Razonamiento Matemático (12 preguntas)</option>
                                     <option value="Razonamiento Verbal">Razonamiento Verbal (13 preguntas)</option>
@@ -185,7 +185,7 @@
                                     <option value="15" selected>15 preguntas</option>
                                     <option value="20">20 preguntas</option>
                                     <option value="30">30 preguntas</option>
-                                    <option value="60">60 preguntas (Examen completo)</option>
+                                    <option value="65">65 preguntas (Examen completo IEN)</option>
                                 </select>
                                 <button class="btn btn-primary" id="btn-generate" onclick="generateIEN()" style="white-space: nowrap; border-color: #ff6b6b; background: #ff6b6b;">
                                     Generar
@@ -221,6 +221,7 @@
             <h2 style="color:#1a1a2e; margin-bottom:0.5rem;">Acceder al Simulacro IEN</h2>
             <p style="color:#888; margin-bottom:1.5rem; font-size:0.9rem;">Ingresa tus datos para participar del simulacro</p>
             <div id="student-login-form">
+                <input type="text" id="student-nombre" placeholder="Nombre completo" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
                 <input type="email" id="student-email" placeholder="Tu correo electronico" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
                 <input type="password" id="student-password" placeholder="Contrasena (min 6 caracteres)" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:1rem; box-sizing:border-box;">
                 <button id="student-login-btn" onclick="studentLogin()" style="width:100%; padding:0.9rem; background:#ff6b6b; color:white; border:none; border-radius:8px; font-size:1.1rem; font-weight:bold; cursor:pointer; margin-bottom:0.8rem;">Iniciar Sesion</button>
@@ -228,7 +229,8 @@
             </div>
             <div id="student-user-info" style="display:none;">
                 <p style="color:#333; margin-bottom:0.5rem;">Conectado como:</p>
-                <p id="student-email-display" style="font-weight:bold; color:#ff6b6b; font-size:1.1rem; margin-bottom:1rem;"></p>
+                <p id="student-nombre-display" style="font-weight:bold; color:#1a1a2e; font-size:1.1rem; margin-bottom:0.3rem;"></p>
+                <p id="student-email-display" style="color:#ff6b6b; font-size:0.9rem; margin-bottom:1rem;"></p>
                 <button onclick="studentLogout()" style="padding:0.6rem 1.5rem; background:white; color:#e74c3c; border:2px solid #e74c3c; border-radius:8px; font-weight:bold; cursor:pointer;">Cerrar sesion</button>
             </div>
             <p id="student-login-error" style="color:#e74c3c; margin-top:0.8rem; font-size:0.85rem; display:none;"></p>
@@ -278,9 +280,15 @@
         window.studentLogin = async function() {
             const email = document.getElementById("student-email").value.trim();
             const password = document.getElementById("student-password").value;
+            const nombre = document.getElementById("student-nombre").value.trim();
             const errorEl = document.getElementById("student-login-error");
             errorEl.style.display = "none";
 
+            if (!nombre) {
+                errorEl.textContent = "Ingresa tu nombre completo.";
+                errorEl.style.display = "block";
+                return;
+            }
             if (!email || !password) {
                 errorEl.textContent = "Ingresa tu correo y contrasena.";
                 errorEl.style.display = "block";
@@ -297,7 +305,8 @@
                     errorEl.style.display = "block";
                 } else {
                     window._studentUser = data.user;
-                    localStorage.setItem("area52_student", JSON.stringify({ email: data.user.email }));
+                    window._studentNombre = nombre;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: data.user.email, nombre: nombre }));
                     showStudentLogged();
                     document.getElementById("student-login-modal").style.display = "none";
                     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -315,9 +324,15 @@
         window.studentRegister = async function() {
             const email = document.getElementById("student-email").value.trim();
             const password = document.getElementById("student-password").value;
+            const nombre = document.getElementById("student-nombre").value.trim();
             const errorEl = document.getElementById("student-login-error");
             errorEl.style.display = "none";
 
+            if (!nombre) {
+                errorEl.textContent = "Ingresa tu nombre completo.";
+                errorEl.style.display = "block";
+                return;
+            }
             if (!email || !password) {
                 errorEl.textContent = "Ingresa tu correo y contrasena.";
                 errorEl.style.display = "block";
@@ -333,13 +348,14 @@
             btn.disabled = true; btn.textContent = "Creando cuenta...";
 
             try {
-                const { data, error } = await window._supabase.auth.signUp({ email, password });
+                const { data, error } = await window._supabase.auth.signUp({ email, password, options: { data: { full_name: nombre } } });
                 if (error) {
                     errorEl.textContent = error.message.includes("already") ? "Este correo ya esta registrado. Inicia sesion." : error.message;
                     errorEl.style.display = "block";
                 } else {
-                    errorEl.style.color = "#00c896";
-                    errorEl.textContent = "Cuenta creada! Revisa tu correo para confirmar, o inicia sesion.";
+                    window._studentNombre = nombre;
+                    localStorage.setItem("area52_student", JSON.stringify({ email: email, nombre: nombre }));
+                    errorEl.textContent = "Cuenta creada! Ya puedes iniciar sesion.";
                     errorEl.style.display = "block";
                     errorEl.style.color = "#00c896";
                 }
@@ -361,6 +377,7 @@
         function showStudentLogged() {
             document.getElementById("student-login-form").style.display = "none";
             document.getElementById("student-user-info").style.display = "block";
+            document.getElementById("student-nombre-display").textContent = window._studentNombre || "Estudiante";
             document.getElementById("student-email-display").textContent = window._studentUser.email;
         }
 
@@ -369,8 +386,10 @@
             if (saved) {
                 try {
                     const { data: { session } } = await window._supabase.auth.getSession();
-                    if (session && session.user.email === JSON.parse(saved).email) {
+                    const parsed = JSON.parse(saved);
+                    if (session && session.user.email === parsed.email) {
                         window._studentUser = session.user;
+                        window._studentNombre = parsed.nombre || session.user.user_metadata?.full_name || "";
                         showStudentLogged();
                         return;
                     }
@@ -382,10 +401,15 @@
 
         async function initStudentSession() {
             try {
-                const { data: { session } } = await window._supabase.auth.getSession();
-                if (session) {
-                    window._studentUser = session.user;
-                    localStorage.setItem("area52_student", JSON.stringify({ email: session.user.email }));
+                const saved = localStorage.getItem("area52_student");
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    const { data: { session } } = await window._supabase.auth.getSession();
+                    if (session) {
+                        window._studentUser = session.user;
+                        window._studentNombre = parsed.nombre || session.user.user_metadata?.full_name || "";
+                        localStorage.setItem("area52_student", JSON.stringify({ email: session.user.email, nombre: window._studentNombre }));
+                    }
                 }
             } catch(e) {}
         }
@@ -660,11 +684,11 @@
         window.generateIEN = async function() {
             const topic = document.getElementById('ai-topic').value;
             let count = parseInt(document.getElementById('ai-count').value);
-            let duration = 60;
-            if (topic === 'Examen Completo IEN') { count = 60; duration = 165; }
-            else if (topic === 'PE1 - Aptitud Académica y Humanidades') { count = 33; duration = 60; }
-            else if (topic === 'PE2 - Matemática') { count = 13; duration = 60; }
-            else if (topic === 'PE3 - Física y Química') { count = 14; duration = 105; }
+            let duration = 180;
+            if (topic === 'Examen Completo IEN') { count = 65; duration = 180; }
+            else if (topic === 'PE1 - Aptitud Académica y Humanidades') { count = 35; duration = 100; }
+            else if (topic === 'PE2 - Matemática') { count = 13; duration = 40; }
+            else if (topic === 'PE3 - Física y Química') { count = 17; duration = 40; }
             const btn = document.getElementById('btn-generate');
             const status = document.getElementById('ai-status');
             btn.disabled = true; btn.textContent = 'Generando...';
@@ -680,7 +704,7 @@
                 const data = await res.json();
                 if (res.ok && data.preguntas && data.preguntas.length > 0) {
                     startSimulacroIEN({
-                        titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN (60 preguntas)' : `Simulacro IEN: ${topic}`,
+                        titulo: topic === 'Examen Completo IEN' ? 'Examen Completo IEN (65 preguntas - 3 horas)' : `Simulacro IEN: ${topic}`,
                         descripcion: topic === 'Examen Completo IEN' ? 'Examen completo - 2h 45min (formato oficial UNI)' : `Preguntas por IA - ${topic}`,
                         duracion: duration, preguntas: data.preguntas
                     });
@@ -766,40 +790,64 @@
             clearInterval(simulacroTimer);
             document.getElementById("simulacro-timer").style.display = "none";
             const total = simulacroCurrentTest.preguntas.length;
-            let correct = 0;
-            const areaResults = {};
             const details = [];
+            let puntajeTotal = 0;
+            const areaResults = {};
+
+            // Calificacion IEN real por area
+            const SCORING = {
+                'Aptitud Académica': { correct: 2.00, wrong: -0.20 },
+                'Física, Química, Matemática': { correct: 2.50, wrong: -0.25 },
+                'Humanidades y Cultura': { correct: 2.00, wrong: -0.20 },
+                'PE1': { correct: 2.00, wrong: -0.20 },
+                'PE2': { correct: 2.50, wrong: -0.25 },
+                'PE3': { correct: 2.50, wrong: -0.25 },
+                'default': { correct: 2.00, wrong: -0.20 }
+            };
 
             simulacroCurrentTest.preguntas.forEach((q, qi) => {
                 const selected = window.simulacroAnswers[qi];
                 const isCorrect = selected === q.respuestaCorrecta;
-                if (isCorrect) correct++;
+                const isBlank = selected === undefined || selected === null;
+                const area = q.area || 'default';
+                const scoring = SCORING[area] || SCORING['default'];
+
+                let puntos = 0;
+                if (isCorrect) {
+                    puntos = scoring.correct;
+                } else if (!isBlank) {
+                    puntos = scoring.wrong;
+                }
+                puntajeTotal += puntos;
+
                 if (q.area) {
-                    if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, total: 0 };
+                    if (!areaResults[q.area]) areaResults[q.area] = { correct: 0, wrong: 0, blank: 0, total: 0, puntos: 0 };
                     areaResults[q.area].total++;
                     if (isCorrect) areaResults[q.area].correct++;
+                    else if (isBlank) areaResults[q.area].blank++;
+                    else areaResults[q.area].wrong++;
+                    areaResults[q.area].puntos += puntos;
                 }
+
                 details.push({
-                    index: qi,
-                    texto: q.texto,
-                    opciones: q.opciones,
-                    selected: selected,
-                    correct: q.respuestaCorrecta,
-                    isCorrect: isCorrect,
-                    explicacion: q.explicacion || '',
-                    area: q.area || '',
-                    subtema: q.subtema || ''
+                    index: qi, texto: q.texto, opciones: q.opciones,
+                    selected: selected, correct: q.respuestaCorrecta,
+                    isCorrect: isCorrect, isBlank: isBlank,
+                    explicacion: q.explicacion || '', area: q.area || '', subtema: q.subtema || '',
+                    puntos: puntos
                 });
             });
 
-            const pct = Math.round((correct / total) * 100);
+            const maxPuntaje = total * 2.00;
+            const pct = Math.round((puntajeTotal / maxPuntaje) * 100);
             const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
             const elapsedMin = Math.floor(elapsed / 60);
             let msg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
 
             // Guardar en BD
+            let nombre = window._studentNombre || "Sin nombre";
+            let email = "anonimo";
             try {
-                let email = "anonimo";
                 if (window._studentUser?.email) {
                     email = window._studentUser.email;
                 } else {
@@ -809,8 +857,9 @@
                 await supabase.from("simulacro_submissions").upsert({
                     simulacro_id: simulacroCurrentTest.id || null,
                     estudiante_email: email,
+                    nombre_completo: nombre,
                     respuestas: window.simulacroAnswers,
-                    puntaje: correct,
+                    puntaje: Math.round(puntajeTotal * 100) / 100,
                     total_preguntas: total,
                     porcentaje: pct,
                     tiempo_segundos: elapsed,
@@ -822,28 +871,50 @@
 
             // Resultados
             let breakdown = '';
-            if (Object.keys(areaResults).length > 1) {
-                const colors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
-                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultados por Prueba:</h3>';
+            const areaNames = { 'PE1': 'Aptitud Academica', 'PE2': 'Matematica, Fisica, Quimica', 'PE3': 'Humanidades' };
+            const areaColors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
+            if (Object.keys(areaResults).length > 0) {
+                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultado por Area:</h3>';
                 for (const [name, d] of Object.entries(areaResults)) {
-                    const p = Math.round((d.correct / d.total) * 100);
-                    breakdown += `<div style="margin-bottom:0.8rem;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${colors[name] || '#333'};">${name}</span><span style="color:#ff6b6b;">${d.correct}/${d.total} (${p}%)</span></div><div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${p}%;background:${p >= 70 ? '#00c896' : p >= 50 ? '#f39c12' : '#e74c3c'};border-radius:4px;"></div></div></div>`;
+                    const color = areaColors[name] || '#ff6b6b';
+                    breakdown += `<div style="margin-bottom:0.8rem;padding:0.8rem;background:${color}11;border-left:4px solid ${color};border-radius:4px;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${color};">${name} - ${areaNames[name] || name}</span><span style="color:${color};">${d.puntos.toFixed(2)} pts</span></div><div style="font-size:0.85rem;color:#666;">Correctas: ${d.correct} | Erradas: ${d.wrong} | En blanco: ${d.blank} | Total: ${d.total}</div></div>`;
                 }
                 breakdown += '</div>';
             }
 
+            // Tabla de puestos
+            let leaderboardHtml = '';
+            try {
+                const { data: subs } = await supabase.from("simulacro_submissions")
+                    .select("nombre_completo, puntaje, porcentaje, tiempo_segundos")
+                    .eq("simulacro_id", simulacroCurrentTest.id)
+                    .order("puntaje", { ascending: false })
+                    .order("tiempo_segundos", { ascending: true });
+                if (subs && subs.length > 0) {
+                    leaderboardHtml = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">🏆 Tabla de Puestos</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1a1a2e;color:white;"><th style="padding:0.7rem;text-align:left;">#</th><th style="padding:0.7rem;text-align:left;">Nombre</th><th style="padding:0.7rem;text-align:center;">Puntaje</th><th style="padding:0.7rem;text-align:center;">%</th><th style="padding:0.7rem;text-align:center;">Tiempo</th></tr></thead><tbody>';
+                    subs.forEach((s, i) => {
+                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                        const rowBg = i < 3 ? '#fff9e6' : (i % 2 === 0 ? '#f8f9fa' : 'white');
+                        const mins = Math.floor((s.tiempo_segundos || 0) / 60);
+                        const secs = (s.tiempo_segundos || 0) % 60;
+                        leaderboardHtml += `<tr style="background:${rowBg};border-bottom:1px solid #eee;"><td style="padding:0.6rem;font-weight:bold;">${medal}</td><td style="padding:0.6rem;">${s.nombre_completo || 'Sin nombre'}</td><td style="padding:0.6rem;text-align:center;font-weight:bold;color:#ff6b6b;">${s.puntaje?.toFixed(2) || '0.00'}</td><td style="padding:0.6rem;text-align:center;">${s.porcentaje || 0}%</td><td style="padding:0.6rem;text-align:center;">${mins}:${String(secs).padStart(2,'0')}</td></tr>`;
+                    });
+                    leaderboardHtml += '</tbody></table></div>';
+                }
+            } catch(e) {}
+
             // Solucionario completo
             let solucionario = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Solucionario y Correccion</h3>';
             details.forEach((d, i) => {
-                const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
+                const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : d.isBlank ? '<span style="color:#f39c12;font-weight:bold;">En blanco</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
                 const selectedText = d.selected !== undefined ? d.opciones[d.selected] : '<em>No respondida</em>';
                 const correctText = d.opciones[d.correct];
                 const areaColor = d.area === 'PE1' ? '#3498db' : d.area === 'PE2' ? '#e74c3c' : d.area === 'PE3' ? '#2ecc71' : '#ff6b6b';
                 solucionario += `
-                    <div style="background:${d.isCorrect ? '#f0faf7' : '#fff5f5'};border:1px solid ${d.isCorrect ? '#00c89633' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
+                    <div style="background:${d.isCorrect ? '#f0faf7' : d.isBlank ? '#fffbf0' : '#fff5f5'};border:1px solid ${d.isCorrect ? '#00c89633' : d.isBlank ? '#f39c1233' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                             <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''}</span>
-                            ${icon}
+                            <span>${icon} <span style="font-weight:bold;color:${d.puntos >= 0 ? '#00c896' : '#e74c3c'};">${d.puntos >= 0 ? '+' : ''}${d.puntos.toFixed(2)} pts</span></span>
                         </div>
                         <p style="margin-bottom:0.5rem;color:#333;">${d.texto}</p>
                         <p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Tu respuesta:</strong> ${selectedText}</p>
@@ -855,11 +926,12 @@
 
             document.getElementById("simulacro-test-area").innerHTML = `
                 <div class="simulacro-result">
-                    <h2 style="color:#ff6b6b;font-size:3rem;">${correct}/${total}</h2>
-                    <p style="font-size:1.5rem;color:#333;">${pct}% de aciertos</p>
+                    <h2 style="color:#ff6b6b;font-size:3rem;">${puntajeTotal.toFixed(2)} pts</h2>
+                    <p style="font-size:1.2rem;color:#333;">${pct}% de calificacion | ${correct}/${total} correctas</p>
                     <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
-                    ${breakdown}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${msg}</p>
+                    ${breakdown}
+                    ${leaderboardHtml}
                     ${solucionario}
                     <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
                 </div>`;
