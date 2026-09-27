@@ -122,11 +122,14 @@ ESTRUCTURA DEL EXAMEN IEN (65 preguntas total, 3 horas):
   * Humanidades y Cultura General (6): Literatura, Historia, Geografía
 
 REGLAS:
-- Nivel: Estudiantes de 5to de secundaria (16-18 años)
+- Nivel: Estudiantes de 5to de secundaria (16-18 años) - EXÁMENES DE ALTA DIFICULTAD tipo concurso de admisión UNI
 - El examen IEN usa 5 opciones (A-E)
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
-- Varía la dificultad: 30% fáciles, 50% medias, 20% difíciles
+- DIFICULTAD ALTA: 0% fáciles, 30% medias, 70% difíciles/muy difíciles
+- Las preguntas deben requerir razonamiento profundo, análisis de múltiples pasos y conocimiento especializado
+- Incluye preguntas trampa: opciones distractores plausibles que confundan al no dominar el tema
+- Evita preguntas de memoria directa; prioriza aplicación, análisis y síntesis
 - SI HAY GUÍA DEL ADMINISTRADOR: usa el estilo y nivel de dificultad como referencia
 - NO repitas conceptos entre preguntas`;
   } else {
