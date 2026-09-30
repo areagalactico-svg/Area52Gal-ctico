@@ -1,4 +1,4 @@
-import { supabase, ADMIN_EMAIL } from "./supabase-config.js";
+import { supabase, ADMIN_EMAIL, ADMIN_EMAILS } from "./supabase-config.js";
 
 let currentEditId = null;
 let currentType = null;
@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function checkAuth() {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session && session.user.email === ADMIN_EMAIL) {
+  if (session && ADMIN_EMAILS.includes(session.user.email)) {
     showAdmin(session.user);
   } else {
     document.getElementById("login-page").style.display = "flex";
@@ -51,7 +51,7 @@ async function login() {
     return;
   }
 
-  if (data.user.email !== ADMIN_EMAIL) {
+  if (!ADMIN_EMAILS.includes(data.user.email)) {
     await supabase.auth.signOut();
     document.getElementById("login-error").textContent = "Acceso denegado. Solo el administrador puede acceder.";
     document.getElementById("login-error").style.display = "block";

@@ -5,6 +5,10 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ADMIN_EMAIL = "areagalactico@gmail.com";
+const ADMIN_EMAILS = [
+  "areagalactico@gmail.com",
+  "robinamadocabreranavarro@gmail.com"
+];
+const ADMIN_EMAIL = ADMIN_EMAILS[0];
 
-export { supabase, ADMIN_EMAIL };
+export { supabase, ADMIN_EMAIL, ADMIN_EMAILS };
