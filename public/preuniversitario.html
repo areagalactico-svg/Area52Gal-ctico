@@ -664,6 +664,7 @@
 
                         let statusHtml = '';
                         let canStart = false;
+                        let canViewResults = false;
                         if (!inicio) {
                             statusHtml = '<span class="badge-tag">Sin fecha programada</span>';
                             canStart = true;
@@ -678,7 +679,8 @@
                             if (mins > 0) timeStr += ` ${mins}min`;
                             statusHtml = `<span class="badge-tag" style="background:#cce5ff;color:#004085;">Inicia en ${timeStr.trim()}</span>`;
                         } else if (fin && now > fin) {
-                            statusHtml = '<span class="badge-tag" style="background:#d4edda;color:#155724;">Finalizado</span>';
+                            statusHtml = '<span class="badge-tag" style="background:#d4edda;color:#155724;">Finalizado - Ver tu nota aquí</span>';
+                            canViewResults = true;
                         } else {
                             statusHtml = '<span class="badge-tag" style="background:#f8d7da;color:#721c24;">En curso - ¡Ahora puedes darlo!</span>';
                             canStart = true;
@@ -686,17 +688,23 @@
 
                         const card = document.createElement("div");
                         card.className = "content-card";
-                        card.style.cursor = canStart ? "pointer" : "not-allowed";
-                        card.style.opacity = canStart ? "1" : "0.7";
+                        card.style.cursor = (canStart || canViewResults) ? "pointer" : "not-allowed";
+                        card.style.opacity = canStart ? "1" : "0.85";
                         if (canStart && inicio && now >= inicio) {
                             card.style.borderLeft = "4px solid #00c896";
                             card.style.background = "#f0faf7";
+                        }
+                        if (canViewResults) {
+                            card.style.borderLeft = "4px solid #3498db";
+                            card.style.background = "#f0f6ff";
                         }
                         const archInfo = numArch > 0 ? ` | ${numArch} archivo${numArch > 1 ? 's' : ''}` : '';
                         const durInfo = `${duracionMin} min`;
                         card.innerHTML = `<h3>${item.titulo}</h3><p style="color:#666;">${item.descripcion || ""}</p>${fechaHtml}<p style="color:#ff6b6b;font-weight:bold;">${numPreg > 0 ? numPreg + ' preguntas' : 'Solo archivos'}${archInfo} | ${durInfo}</p><p>${statusHtml}</p>`;
                         if (canStart) {
                             card.onclick = () => startSimulacroIEN(item);
+                        } else if (canViewResults) {
+                            card.onclick = () => showFinishedResults(item);
                         }
                         choices.appendChild(card);
                     });
@@ -831,20 +839,21 @@
             if (topProgress) topProgress.textContent = `${answered}/${total} respondidas`;
         };
 
-        window.submitSimulacroIEN = async function() {
-            const answered = Object.keys(window.simulacroAnswers || {}).length;
-            const total = simulacroCurrentTest.preguntas.length;
-            const unanswered = total - answered;
+        async function resolveStudentEmail() {
+            if (window._studentUser?.email) return window._studentUser.email;
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user?.email) return session.user.email;
+            } catch (e) {}
+            return "anonimo";
+        }
 
-            let msg = "¿Entregar el simulacro ahora?";
-            if (unanswered > 0) {
-                msg = `Tienes ${unanswered} pregunta${unanswered > 1 ? 's' : ''} sin responder. ¿Entregar de todas formas?`;
-            }
-            if (!confirm(msg)) return;
+        function getExamEndDate(test) {
+            if (!test || !test.fecha_inicio) return 0;
+            return new Date(test.fecha_inicio).getTime() + (test.duracion || 140) * 60000;
+        }
 
-            clearInterval(simulacroTimer);
-            document.getElementById("simulacro-timer").style.display = "none";
-            document.getElementById("simulacro-topbar").style.display = "none";
+        function computeSimulacroResults(test, answers, elapsedSec) {
             const details = [];
             let puntajeTotal = 0;
             let correct = 0;
@@ -861,8 +870,8 @@
                 'default': { correct: 2.00, wrong: -0.20 }
             };
 
-            simulacroCurrentTest.preguntas.forEach((q, qi) => {
-                const selected = window.simulacroAnswers[qi];
+            test.preguntas.forEach((q, qi) => {
+                const selected = answers[qi];
                 const isCorrect = selected === q.respuestaCorrecta;
                 const isBlank = selected === undefined || selected === null;
                 const area = q.area || 'default';
@@ -895,74 +904,89 @@
                 });
             });
 
+            const total = test.preguntas.length;
             const maxPuntaje = total * 2.00;
             const pct = Math.round((puntajeTotal / maxPuntaje) * 100);
-            const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
-            const elapsedMin = Math.floor(elapsed / 60);
-            const resultadoMsg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
+            const nota = Math.max(0, Math.min(20, (puntajeTotal / maxPuntaje) * 20));
+            return { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed: elapsedSec };
+        }
 
-            // Guardar en BD
-            let nombre = window._studentNombre || "Sin nombre";
-            let whatsapp = window._studentWhatsapp || "";
-            let email = "anonimo";
+        async function fetchSimulacroLeaderboard(simId, myEmail) {
+            const result = { rows: [], rank: 0 };
+            if (!simId) return result;
             try {
-                if (window._studentUser?.email) {
-                    email = window._studentUser.email;
-                } else {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    email = session?.user?.email || "anonimo";
-                }
-                await supabase.from("simulacro_submissions").upsert({
-                    simulacro_id: simulacroCurrentTest.id || null,
-                    estudiante_email: email,
-                    nombre_completo: nombre,
-                    whatsapp: whatsapp,
-                    respuestas: window.simulacroAnswers,
-                    puntaje: Math.round(puntajeTotal * 100) / 100,
-                    total_preguntas: total,
-                    porcentaje: pct,
-                    tiempo_segundos: elapsed,
-                    area_results: areaResults,
-                    fecha_inicio: simulacroStartTime?.toISOString(),
-                    fecha_fin: new Date().toISOString()
-                }, { onConflict: "simulacro_id,estudiante_email" });
-            } catch (e) { console.error("Error guardando submission:", e); }
-
-            // Resultados
-            let breakdown = '';
-            const areaNames = { 'PE1': 'Aptitud Academica', 'PE2': 'Matematica, Fisica, Quimica', 'PE3': 'Humanidades' };
-            const areaColors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
-            if (Object.keys(areaResults).length > 0) {
-                breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultado por Area:</h3>';
-                for (const [name, d] of Object.entries(areaResults)) {
-                    const color = areaColors[name] || '#ff6b6b';
-                    breakdown += `<div style="margin-bottom:0.8rem;padding:0.8rem;background:${color}11;border-left:4px solid ${color};border-radius:4px;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${color};">${name} - ${areaNames[name] || name}</span><span style="color:${color};">${d.puntos.toFixed(2)} pts</span></div><div style="font-size:0.85rem;color:#666;">Correctas: ${d.correct} | Erradas: ${d.wrong} | En blanco: ${d.blank} | Total: ${d.total}</div></div>`;
-                }
-                breakdown += '</div>';
-            }
-
-            // Tabla de puestos
-            let leaderboardHtml = '';
-            try {
-                const { data: subs } = await supabase.from("simulacro_submissions")
-                    .select("nombre_completo, whatsapp, puntaje, porcentaje, tiempo_segundos")
-                    .eq("simulacro_id", simulacroCurrentTest.id)
+                const { data: subs, error } = await supabase.from("simulacro_leaderboard")
+                    .select("estudiante_email, nombre_completo, whatsapp, puntaje, nota, porcentaje, tiempo_segundos")
+                    .eq("simulacro_id", simId)
                     .order("puntaje", { ascending: false })
                     .order("tiempo_segundos", { ascending: true });
-                if (subs && subs.length > 0) {
-                    leaderboardHtml = '<div style="margin:2rem 0;text-align:left;max-width:800px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">🏆 Tabla de Puestos</h3><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1a1a2e;color:white;"><th style="padding:0.7rem;text-align:left;">#</th><th style="padding:0.7rem;text-align:left;">Nombre</th><th style="padding:0.7rem;text-align:left;">WhatsApp</th><th style="padding:0.7rem;text-align:center;">Puntaje</th><th style="padding:0.7rem;text-align:center;">%</th><th style="padding:0.7rem;text-align:center;">Tiempo</th></tr></thead><tbody>';
-                    subs.forEach((s, i) => {
-                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
-                        const rowBg = i < 3 ? '#fff9e6' : (i % 2 === 0 ? '#f8f9fa' : 'white');
-                        const mins = Math.floor((s.tiempo_segundos || 0) / 60);
-                        const secs = (s.tiempo_segundos || 0) % 60;
-                        leaderboardHtml += `<tr style="background:${rowBg};border-bottom:1px solid #eee;"><td style="padding:0.6rem;font-weight:bold;">${medal}</td><td style="padding:0.6rem;">${s.nombre_completo || 'Sin nombre'}</td><td style="padding:0.6rem;color:#25d366;">${s.whatsapp || '-'}</td><td style="padding:0.6rem;text-align:center;font-weight:bold;color:#ff6b6b;">${s.puntaje?.toFixed(2) || '0.00'}</td><td style="padding:0.6rem;text-align:center;">${s.porcentaje || 0}%</td><td style="padding:0.6rem;text-align:center;">${mins}:${String(secs).padStart(2,'0')}</td></tr>`;
-                    });
-                    leaderboardHtml += '</tbody></table></div>';
+                if (error || !subs) return result;
+                result.rows = subs;
+                if (myEmail && myEmail !== "anonimo") {
+                    const idx = subs.findIndex(s => s.estudiante_email === myEmail);
+                    result.rank = idx >= 0 ? idx + 1 : 0;
                 }
-            } catch(e) {}
+            } catch (e) {}
+            return result;
+        }
 
-            // Solucionario completo
+        function buildBreakdownHTML(areaResults) {
+            if (Object.keys(areaResults).length === 0) return '';
+            const areaNames = { 'PE1': 'Aptitud Academica', 'PE2': 'Matematica, Fisica, Quimica', 'PE3': 'Humanidades' };
+            const areaColors = { 'PE1': '#3498db', 'PE2': '#e74c3c', 'PE3': '#2ecc71' };
+            let breakdown = '<div style="margin:1.5rem 0;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Resultado por Area:</h3>';
+            for (const [name, d] of Object.entries(areaResults)) {
+                const color = areaColors[name] || '#ff6b6b';
+                breakdown += `<div style="margin-bottom:0.8rem;padding:0.8rem;background:${color}11;border-left:4px solid ${color};border-radius:4px;"><div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;"><span style="font-weight:bold;color:${color};">${name} - ${areaNames[name] || name}</span><span style="color:${color};">${d.puntos.toFixed(2)} pts</span></div><div style="font-size:0.85rem;color:#666;">Correctas: ${d.correct} | Erradas: ${d.wrong} | En blanco: ${d.blank} | Total: ${d.total}</div></div>`;
+            }
+            breakdown += '</div>';
+            return breakdown;
+        }
+
+        function buildLeaderboardHTML(lb, myEmail) {
+            if (!lb || !lb.rows || lb.rows.length === 0) return '';
+            const rows = lb.rows;
+            const showTop = 50;
+            const top = rows.slice(0, showTop);
+            const myIdx = myEmail && myEmail !== "anonimo" ? rows.findIndex(s => s.estudiante_email === myEmail) : -1;
+
+            let html = `<div style="margin:2rem 0;text-align:left;max-width:800px;margin-left:auto;margin-right:auto;">
+                <h3 style="margin-bottom:0.3rem;color:#1a1a2e;text-align:center;">🏆 Orden de Mérito</h3>
+                <p style="text-align:center;color:#888;font-size:0.9rem;margin-bottom:1rem;">${rows.length} participante${rows.length > 1 ? 's' : ''}</p>
+                ${lb.rank > 0 ? `<p style="text-align:center;font-size:1.15rem;margin-bottom:1rem;background:#fff3cd;border:1px solid #ffe08a;border-radius:8px;padding:0.7rem;">Tu puesto: <strong style="color:#ff6b6b;font-size:1.4rem;">N° ${lb.rank}</strong> de ${rows.length}</p>` : ''}
+                <table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr style="background:#1a1a2e;color:white;">
+                <th style="padding:0.7rem;text-align:left;">Puesto</th>
+                <th style="padding:0.7rem;text-align:left;">Nombre</th>
+                <th style="padding:0.7rem;text-align:center;">Nota /20</th>
+                <th style="padding:0.7rem;text-align:center;">%</th>
+                <th style="padding:0.7rem;text-align:center;">Tiempo</th>
+                </tr></thead><tbody>`;
+
+            const renderRow = (s, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                const isMe = myEmail && myEmail !== "anonimo" && s.estudiante_email === myEmail;
+                const rowBg = isMe ? '#fff3cd' : (i < 3 ? '#fff9e6' : (i % 2 === 0 ? '#f8f9fa' : 'white'));
+                const mins = Math.floor((s.tiempo_segundos || 0) / 60);
+                const secs = (s.tiempo_segundos || 0) % 60;
+                return `<tr style="background:${rowBg};border-bottom:1px solid #eee;">
+                    <td style="padding:0.6rem;font-weight:bold;">${medal}</td>
+                    <td style="padding:0.6rem;${isMe ? 'font-weight:bold;color:#ff6b6b;' : ''}">${s.nombre_completo || 'Sin nombre'}${isMe ? ' (tú)' : ''}</td>
+                    <td style="padding:0.6rem;text-align:center;font-weight:bold;color:#1a1a2e;">${(s.nota != null ? Number(s.nota) : 0).toFixed(1)}</td>
+                    <td style="padding:0.6rem;text-align:center;">${s.porcentaje || 0}%</td>
+                    <td style="padding:0.6rem;text-align:center;">${mins}:${String(secs).padStart(2, '0')}</td>
+                </tr>`;
+            };
+
+            top.forEach((s, i) => { html += renderRow(s, i); });
+            if (myIdx >= showTop) {
+                html += `<tr><td colspan="5" style="text-align:center;color:#888;padding:0.4rem;">...</td></tr>`;
+                html += renderRow(rows[myIdx], myIdx);
+            }
+            html += '</tbody></table></div>';
+            return html;
+        }
+
+        function buildSolucionarioHTML(details) {
             let solucionario = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Solucionario y Correccion</h3>';
             details.forEach((d, i) => {
                 const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : d.isBlank ? '<span style="color:#f39c12;font-weight:bold;">En blanco</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
@@ -982,18 +1006,183 @@
                     </div>`;
             });
             solucionario += '</div>';
+            return solucionario;
+        }
 
-            document.getElementById("simulacro-test-area").innerHTML = `
+        function buildResultsPageHTML(state, lb, myEmail) {
+            const { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed } = state;
+            const elapsedMin = Math.floor(elapsed / 60);
+            const resultadoMsg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
+            const breakdown = buildBreakdownHTML(areaResults);
+            const leaderboardHtml = buildLeaderboardHTML(lb, myEmail);
+            const solucionario = buildSolucionarioHTML(details);
+
+            return `
                 <div class="simulacro-result">
-                    <h2 style="color:#ff6b6b;font-size:3rem;">${puntajeTotal.toFixed(2)} pts</h2>
-                    <p style="font-size:1.2rem;color:#333;">${pct}% de calificacion | ${correct}/${total} correctas</p>
+                    <p style="color:#888;font-size:1rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.3rem;">Tu nota IEN</p>
+                    <h2 style="color:#ff6b6b;font-size:3.5rem;margin:0;">${nota.toFixed(1)} <span style="font-size:1.5rem;color:#888;">/ 20</span></h2>
+                    <p style="font-size:1.1rem;color:#333;margin-top:0.8rem;">${puntajeTotal.toFixed(2)} pts | ${pct}% de calificacion | ${correct}/${total} correctas</p>
                     <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
+                    ${lb && lb.rank > 0 ? `<p style="font-size:1.2rem;font-weight:bold;color:#1a1a2e;margin:1rem 0;">🏆 Tu puesto: N° ${lb.rank} de ${lb.rows.length}</p>` : ''}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>
                     ${breakdown}
                     ${leaderboardHtml}
                     ${solucionario}
                     <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
                 </div>`;
+        }
+
+        function renderResultsLocked(examEnd, state, simId) {
+            window._pendingResults = { state, simId };
+            const releaseDate = new Date(examEnd);
+            const fechaStr = releaseDate.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            const horaStr = releaseDate.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById("simulacro-test-area").innerHTML = `
+                <div class="simulacro-result">
+                    <div style="font-size:3rem;">✅</div>
+                    <h2 style="color:#00c896;">Simulacro enviado correctamente</h2>
+                    <p style="color:#666;margin-top:0.5rem;">Tus ${state.total} respuestas quedaron registradas.</p>
+                    <div style="background:#f0f6ff;border:1px solid #cce5ff;border-radius:12px;padding:1.5rem;margin:1.5rem 0;text-align:left;max-width:560px;margin-left:auto;margin-right:auto;">
+                        <p style="font-weight:bold;color:#1a1a2e;margin-bottom:0.4rem;">Tu nota de 0 a 20 y tu orden de mérito se mostrarán al terminar el tiempo programado del examen:</p>
+                        <p style="font-size:1.15rem;font-weight:bold;color:#ff6b6b;margin:0.4rem 0;">📅 ${fechaStr} - ${horaStr}</p>
+                        <p id="results-countdown" style="font-size:1.5rem;font-weight:bold;color:#1a1a2e;margin-top:0.6rem;">--:--:--</p>
+                    </div>
+                    <button id="btn-reveal" class="btn btn-primary" disabled style="opacity:0.5;cursor:not-allowed;padding:0.9rem 2rem;margin-bottom:0.8rem;" onclick="revealPendingResults()">Ver mi nota y orden de mérito</button>
+                    <br>
+                    <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
+                </div>`;
+
+            const tick = setInterval(() => {
+                const diff = examEnd - Date.now();
+                const cd = document.getElementById("results-countdown");
+                if (!cd) { clearInterval(tick); return; }
+                if (diff <= 0) {
+                    clearInterval(tick);
+                    cd.textContent = "¡Tiempo cumplido! Ya puedes ver tu resultado.";
+                    cd.style.color = "#00c896";
+                    const b = document.getElementById("btn-reveal");
+                    if (b) { b.disabled = false; b.style.opacity = "1"; b.style.cursor = "pointer"; }
+                    return;
+                }
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                cd.textContent = `Faltan ${h}h ${String(m).padStart(2, '0')}min ${String(s).padStart(2, '0')}s`;
+            }, 1000);
+        }
+
+        window.revealPendingResults = async function() {
+            const pending = window._pendingResults;
+            if (!pending) return;
+            const email = await resolveStudentEmail();
+            const lb = await fetchSimulacroLeaderboard(pending.simId, email);
+            document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(pending.state, lb, email);
+            window._pendingResults = null;
+        };
+
+        window.showFinishedResults = async function(item) {
+            document.getElementById("simulacro-list-area").style.display = "none";
+            const area = document.getElementById("simulacro-test-area");
+            area.style.display = "block";
+            area.innerHTML = '<div class="simulacro-result"><p style="color:#888;">Cargando tu resultado...</p></div>';
+
+            const email = await resolveStudentEmail();
+            let state = null;
+            try {
+                const cached = JSON.parse(localStorage.getItem("area52_res_" + item.id) || "null");
+                if (cached && cached.answers) {
+                    state = computeSimulacroResults(item, cached.answers, cached.elapsed || 0);
+                }
+            } catch (e) {}
+
+            if (!state && email && email !== "anonimo") {
+                try {
+                    const { data: sub } = await supabase.from("simulacro_submissions")
+                        .select("respuestas, tiempo_segundos")
+                        .eq("simulacro_id", item.id)
+                        .eq("estudiante_email", email)
+                        .maybeSingle();
+                    if (sub && sub.respuestas) {
+                        state = computeSimulacroResults(item, sub.respuestas, sub.tiempo_segundos || 0);
+                    }
+                } catch (e) {}
+            }
+
+            if (!state) {
+                area.innerHTML = `
+                    <div class="simulacro-result">
+                        <div style="font-size:3rem;">🔍</div>
+                        <h2 style="color:#1a1a2e;">No encontramos tu presentación</h2>
+                        <p style="color:#666;margin:1rem 0;">No presentaste este simulacro, o lo hiciste sin iniciar sesión y en otro dispositivo.</p>
+                        <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
+                    </div>`;
+                return;
+            }
+
+            const lb = await fetchSimulacroLeaderboard(item.id, email);
+            area.innerHTML = buildResultsPageHTML(state, lb, email);
+        };
+
+        window.submitSimulacroIEN = async function() {
+            const answered = Object.keys(window.simulacroAnswers || {}).length;
+            const total = simulacroCurrentTest.preguntas.length;
+            const unanswered = total - answered;
+
+            let msg = "¿Entregar el simulacro ahora?";
+            if (unanswered > 0) {
+                msg = `Tienes ${unanswered} pregunta${unanswered > 1 ? 's' : ''} sin responder. ¿Entregar de todas formas?`;
+            }
+            if (!confirm(msg)) return;
+
+            clearInterval(simulacroTimer);
+            document.getElementById("simulacro-timer").style.display = "none";
+            document.getElementById("simulacro-topbar").style.display = "none";
+            const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
+            const state = computeSimulacroResults(simulacroCurrentTest, window.simulacroAnswers, elapsed);
+            const email = await resolveStudentEmail();
+            const nombre = window._studentNombre || "Sin nombre";
+            const whatsapp = window._studentWhatsapp || "";
+            const examEnd = getExamEndDate(simulacroCurrentTest);
+            const isScheduled = examEnd > 0;
+
+            // Guardar respuestas y nota (reintentos + jitter para soportar miles de envios simultaneos)
+            const payload = {
+                simulacro_id: simulacroCurrentTest.id || null,
+                estudiante_email: email,
+                nombre_completo: nombre,
+                whatsapp: whatsapp,
+                respuestas: window.simulacroAnswers,
+                puntaje: Math.round(state.puntajeTotal * 100) / 100,
+                nota: Math.round(state.nota * 100) / 100,
+                total_preguntas: state.total,
+                porcentaje: state.pct,
+                tiempo_segundos: elapsed,
+                area_results: state.areaResults,
+                fecha_inicio: simulacroStartTime?.toISOString(),
+                fecha_fin: new Date().toISOString()
+            };
+            try {
+                localStorage.setItem("area52_res_" + (simulacroCurrentTest.id || "adhoc"), JSON.stringify({ answers: window.simulacroAnswers, elapsed: elapsed }));
+            } catch (e) {}
+
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            if (isScheduled) await sleep(Math.random() * 4000);
+            for (let attempt = 0; attempt < 4; attempt++) {
+                try {
+                    const { error } = await supabase.from("simulacro_submissions").upsert(payload, { onConflict: "simulacro_id,estudiante_email" });
+                    if (!error) break;
+                } catch (e) {}
+                await sleep(1000 * Math.pow(2, attempt));
+            }
+
+            // Si el examen programado aun no termina, ocultar nota, orden de merito y solucionario
+            if (isScheduled && Date.now() < examEnd) {
+                renderResultsLocked(examEnd, state, simulacroCurrentTest.id);
+                return;
+            }
+
+            const lb = await fetchSimulacroLeaderboard(simulacroCurrentTest.id, email);
+            document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(state, lb, email);
         };
 
         if (window._selectedUni === "UNI") {

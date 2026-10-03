@@ -214,3 +214,30 @@ CREATE POLICY "Admin select all submissions" ON simulacro_submissions FOR SELECT
 CREATE POLICY "Lectura pública archivos" ON storage.objects FOR SELECT USING (bucket_id IN ('examenes', 'simulacros', 'materiales'));
 CREATE POLICY "Admin upload archivos" ON storage.objects FOR INSERT WITH CHECK (bucket_id IN ('examenes', 'simulacros', 'materiales') AND auth.role() = 'authenticated');
 CREATE POLICY "Admin delete archivos" ON storage.objects FOR DELETE USING (bucket_id IN ('examenes', 'simulacros', 'materiales') AND auth.role() = 'authenticated');
+
+-- ============================================
+-- Migración: Nota 0-20 + Orden de mérito
+-- Ejecutar en Supabase SQL Editor
+-- ============================================
+
+-- Nota escalada 0-20 (se calcula en el cliente al enviar)
+ALTER TABLE simulacro_submissions ADD COLUMN IF NOT EXISTS nota NUMERIC(4,2) DEFAULT 0;
+
+-- Vista pública con solo datos de tabla de mérito (sin respuestas ni correos)
+-- Los anónimos pueden leer esta vista (necesario para mostrar el orden de mérito a todos)
+CREATE OR REPLACE VIEW simulacro_leaderboard AS
+SELECT
+  simulacro_id,
+  estudiante_email,
+  nombre_completo,
+  whatsapp,
+  puntaje,
+  nota,
+  porcentaje,
+  tiempo_segundos,
+  fecha_fin
+FROM simulacro_submissions;
+
+GRANT SELECT ON simulacro_leaderboard TO anon;
+GRANT SELECT ON simulacro_leaderboard TO authenticated;
+
