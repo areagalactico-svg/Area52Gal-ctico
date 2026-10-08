@@ -47,10 +47,57 @@
       <div class="tabs">
         <button class="tab-btn active" data-tab="tests">Test Vocacionales</button>
         <button class="tab-btn" data-tab="simulacros">Simulacros IEN</button>
+        <button class="tab-btn" data-tab="resultados">🏆 Resultados y Mérito</button>
+        <button class="tab-btn" data-tab="agentes">🤖 Agentes IA</button>
         <button class="tab-btn" data-tab="videos">Videos</button>
         <button class="tab-btn" data-tab="temarios">Temarios</button>
         <button class="tab-btn" data-tab="examenes">Exámenes</button>
         <button class="tab-btn" data-tab="materiales">📚 Materiales IA</button>
+      </div>
+
+      <!-- Resultados y Orden de Mérito (global) -->
+      <div class="tab-content" id="tab-resultados">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h2>🏆 Notas, estudiantes y orden de mérito</h2>
+          <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+            <select id="res-simulacro" style="padding:0.5rem; border:2px solid #e0e0e0; border-radius:8px;"></select>
+            <input id="res-buscar" placeholder="Buscar nombre / correo / número..." style="padding:0.5rem; border:2px solid #e0e0e0; border-radius:8px; min-width:220px;">
+            <button class="btn btn-primary" id="res-exportar">⬇ Exportar CSV</button>
+          </div>
+        </div>
+        <div id="res-resumen" style="display:flex; gap:0.7rem; flex-wrap:wrap; margin-bottom:1rem;"></div>
+        <div id="res-tabla-wrap" style="overflow-x:auto; background:white; border-radius:12px; padding:0.5rem;"></div>
+      </div>
+
+      <!-- Agentes recolectores + Guías -->
+      <div class="tab-content" id="tab-agentes">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h2>🤖 Agentes recolectores por universidad</h2>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <select id="ag-uni" style="padding:0.5rem; border:2px solid #e0e0e0; border-radius:8px;">
+              <option value="ALL">Todas las universidades</option>
+              <option value="UNI">UNI</option>
+              <option value="San Marcos">San Marcos</option>
+              <option value="Católica">Católica</option>
+              <option value="La Molina">La Molina</option>
+              <option value="San Martín">San Martín</option>
+              <option value="Pacifico">Pacífico</option>
+            </select>
+            <label style="font-size:0.85rem; color:#555;"><input type="checkbox" id="ag-save"> Guardar en Supabase</label>
+            <button class="btn btn-primary" id="ag-run">▶ Recolectar ahora</button>
+          </div>
+        </div>
+        <p style="color:#666; font-size:0.9rem; margin-bottom:1rem;">
+          Los agentes visitan las páginas oficiales de admisión de cada universidad y traen exámenes,
+          solucionarios, prospectos, temarios y guías públicas. Revisa los hallazgos y guárdalos como
+          Exámenes/Materiales: la IA los usará para generar simulacros y <strong>guías personalizadas</strong>.
+          También puedes correrlos localmente: <code>node agents/run-collect.js --uni=UNI --save</code>
+        </p>
+        <div id="ag-status" style="margin-bottom:1rem; color:#555;"></div>
+        <div id="ag-resultados"></div>
+        <h2 style="margin-top:2rem;">📖 Guías personalizadas generadas</h2>
+        <p style="color:#666; font-size:0.9rem; margin-bottom:1rem;">Últimas guías creadas para estudiantes con IA (nota, focos y plan de 4 semanas).</p>
+        <div id="guias-list"></div>
       </div>
 
       <!-- Test Vocacionales -->
@@ -126,5 +173,6 @@
   </div>
 
   <script type="module" src="/js/admin.js"></script>
+  <script type="module" src="/js/admin-resultados.js"></script>
 </body>
 </html>

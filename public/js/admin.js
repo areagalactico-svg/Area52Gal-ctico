@@ -828,6 +828,7 @@ window.viewSimulacroResults = async function(simulacroId) {
               <th style="padding:0.7rem; text-align:left;">Nombre</th>
               <th style="padding:0.7rem; text-align:left;">WhatsApp</th>
               <th style="padding:0.7rem; text-align:left;">Email</th>
+              <th style="padding:0.7rem; text-align:center;">Nota /20</th>
               <th style="padding:0.7rem; text-align:center;">Puntaje</th>
               <th style="padding:0.7rem; text-align:center;">Correctas</th>
               <th style="padding:0.7rem; text-align:center;">%</th>
@@ -849,6 +850,7 @@ window.viewSimulacroResults = async function(simulacroId) {
           <td style="padding:0.6rem; font-weight:600;">${s.nombre_completo || 'Sin nombre'}</td>
           <td style="padding:0.6rem; color:#25d366;">${s.whatsapp || '-'}</td>
           <td style="padding:0.6rem; color:#888; font-size:0.8rem;">${s.estudiante_email || '-'}</td>
+          <td style="padding:0.6rem; text-align:center; font-weight:bold; color:#00a37a; font-size:1rem;">${(s.nota != null ? Number(s.nota) : 0).toFixed(1)}</td>
           <td style="padding:0.6rem; text-align:center; font-weight:bold; color:#ff6b6b; font-size:1rem;">${s.puntaje?.toFixed(2) || '0.00'}</td>
           <td style="padding:0.6rem; text-align:center;">${correctCount}/${totalPreguntas}</td>
           <td style="padding:0.6rem; text-align:center;">${s.porcentaje || 0}%</td>

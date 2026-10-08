@@ -7,7 +7,10 @@
     "dev": "http-server public -p 3000 -c-1",
     "build": "echo 'Build complete'",
     "start": "http-server public -p 5000",
-    "deploy": "vercel"
+    "deploy": "vercel",
+    "agents:collect": "node agents/run-collect.js --uni=ALL",
+    "agents:collect:uni": "node agents/run-collect.js --uni=UNI --save",
+    "agents:guide:test": "node -e \"console.log('Usa POST /api/generate-guide con estudiante+resultado')\""
   },
   "keywords": [
     "UNI",

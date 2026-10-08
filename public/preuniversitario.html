@@ -1027,6 +1027,12 @@
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>
                     ${breakdown}
                     ${leaderboardHtml}
+                    <div id="guia-box" style="margin:2rem auto; max-width:800px; background:#f0faf7; border:1px solid #00c89655; border-radius:12px; padding:1.5rem; text-align:center;">
+                        <h3 style="color:#1a1a2e; margin-bottom:0.4rem;">📖 Tu guía de aprendizaje personalizada</h3>
+                        <p style="color:#555; font-size:0.92rem; margin-bottom:1rem;">La IA cruza tu nota con los exámenes y materiales reales de tu universidad y te arma un plan de 4 semanas.</p>
+                        <button class="btn btn-primary" id="btn-guia" onclick="generarGuiaPersonalizada()" style="background:#00c896; border-color:#00c896;">✨ Generar mi guía</button>
+                        <div id="guia-out" style="margin-top:1rem; text-align:left;"></div>
+                    </div>
                     ${solucionario}
                     <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
                 </div>`;
@@ -1071,11 +1077,48 @@
             }, 1000);
         }
 
+        window._ultimoResultado = null;
+
+        window.generarGuiaPersonalizada = async function() {
+            const out = document.getElementById("guia-out");
+            const btn = document.getElementById("btn-guia");
+            const R = window._ultimoResultado;
+            if (!R) { if (out) out.innerHTML = '<p style="color:#e74c3c;">No se encontró tu resultado. Recarga y vuelve a ver tu nota.</p>'; return; }
+            btn.disabled = true; btn.textContent = "Generando tu guía...";
+            if (out) out.innerHTML = '<p style="color:#00a37a;">🤖 Analizando tus áreas débiles y el material de tu universidad...</p>';
+            try {
+                const email = await resolveStudentEmail();
+                const res = await fetch("/api/generate-guide", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        estudiante: { nombre: window._studentNombre || "Estudiante", email, whatsapp: window._studentWhatsapp || "", universidad: window._selectedUni || "UNI" },
+                        resultado: { simulacro_id: R.simId || null, simulacro_titulo: R.titulo || "Simulacro", puntaje: R.state.puntajeTotal, nota: Math.round(R.state.nota * 100) / 100, porcentaje: R.state.pct, tiempo_segundos: R.state.elapsed, area_results: R.state.areaResults },
+                        save: true
+                    })
+                });
+                const g = await res.json();
+                if (!res.ok) throw new Error(g.error || "Error IA");
+                const md = g.guia_markdown || "";
+                const html = md.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                    .replace(/^### (.*)$/gm, "<h4 style='color:#1a1a2e; margin:0.8rem 0 0.3rem;'>$1</h4>")
+                    .replace(/^## (.*)$/gm, "<h3 style='color:#00a37a; margin:1rem 0 0.4rem;'>$1</h3>")
+                    .replace(/^# (.*)$/gm, "<h2 style='color:#1a1a2e;'>$1</h2>")
+                    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                    .replace(/^- (.*)$/gm, "<li>$1</li>")
+                    .replace(/\n/g, "<br>");
+                if (out) out.innerHTML = `<div style="background:white; border-radius:8px; padding:1.2rem; line-height:1.7; color:#333;">${html}</div>
+                    <p style="color:#888; font-size:0.85rem; margin-top:0.6rem;">✅ Guía guardada. Tu profesor la verá en el panel Admin → Agentes IA.</p>`;
+            } catch (e) {
+                if (out) out.innerHTML = `<p style="color:#e74c3c;">No se pudo generar la guía: ${e.message}. Intenta de nuevo.</p>`;
+            } finally { btn.disabled = false; btn.textContent = "✨ Generar mi guía"; }
+        };
+
         window.revealPendingResults = async function() {
             const pending = window._pendingResults;
             if (!pending) return;
             const email = await resolveStudentEmail();
             const lb = await fetchSimulacroLeaderboard(pending.simId, email);
+            window._ultimoResultado = { state: pending.state, simId: pending.simId, titulo: "Simulacro" };
             document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(pending.state, lb, email);
             window._pendingResults = null;
         };
@@ -1120,6 +1163,7 @@
             }
 
             const lb = await fetchSimulacroLeaderboard(item.id, email);
+            window._ultimoResultado = { state, simId: item.id, titulo: item.titulo || "Simulacro" };
             area.innerHTML = buildResultsPageHTML(state, lb, email);
         };
 
@@ -1182,6 +1226,7 @@
             }
 
             const lb = await fetchSimulacroLeaderboard(simulacroCurrentTest.id, email);
+            window._ultimoResultado = { state, simId: simulacroCurrentTest.id || null, titulo: simulacroCurrentTest.titulo || "Simulacro" };
             document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(state, lb, email);
         };
 
