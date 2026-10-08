@@ -759,7 +759,8 @@ window.generateSimulacroQuestions = async function(simulacroId) {
         topic: "Examen Completo IEN",
         type: "simulacro",
         count: 65,
-        context: context
+        context: context,
+        universidad: simulacro.universidad || "UNI"
       })
     });
 
@@ -777,7 +778,8 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       if (updateError) {
         alert("Error al guardar las preguntas: " + updateError.message);
       } else {
-        alert(`Se generaron ${data.preguntas.length} preguntas correctamente!`);
+        const extra = data.repetidas_filtradas ? ` (${data.repetidas_filtradas} repetidas filtradas automáticamente)` : "";
+        alert(`Se generaron ${data.preguntas.length} preguntas nuevas sin repetición${extra}!`);
         loadAllData();
       }
     } else {
