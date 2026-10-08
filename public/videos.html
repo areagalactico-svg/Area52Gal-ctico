@@ -18,6 +18,10 @@
     .video-card h3 { margin-bottom: 0.3rem; color: #1a1a2e; }
     .video-card p { color: #888; font-size: 0.9rem; }
     .video-card .badge-cat { display: inline-block; background: #f0faf7; color: #00c896; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-top: 0.5rem; }
+    .video-thumb { position: relative; cursor: pointer; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+    .video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .video-thumb .play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,200,150,0.92); color: white; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; padding-left: 4px; }
+    .video-thumb:hover .play-btn { transform: translate(-50%, -50%) scale(1.1); }
   </style>
 </head>
 <body>
@@ -51,8 +55,15 @@
     let currentFilter = "Todos";
 
     function extractYoutubeId(url) {
-      const match = url?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?#]+)/);
-      return match ? match[1] : null;
+      const u = (url || "").trim();
+      if (!u) return null;
+      // Cubre: watch?v=, youtu.be/, embed/, v/, shorts/, live/, music.youtube, youtube-nocookie
+      let match = u.match(/(?:youtu\.be\/|(?:[\w-]+\.)?youtube(?:-nocookie)?\.com\/(?:watch\?[^#]*?v=|embed\/|v\/|shorts\/|live\/))([^&?#\s]+)/);
+      if (match) return match[1];
+      // Respaldo: cualquier ?v= o &v= en dominio youtube
+      match = u.match(/[?&]v=([^&?#\s]+)/);
+      if (match && /youtu\.?be/.test(u)) return match[1];
+      return null;
     }
 
     function extractTiktokId(url) {
@@ -61,13 +72,14 @@
     }
 
     function getVideoEmbed(url) {
-      const ytId = extractYoutubeId(url);
-      if (ytId) return { type: "youtube", embed: `https://www.youtube.com/embed/${ytId}` };
+      const clean = (url || "").trim();
+      const ytId = extractYoutubeId(clean);
+      if (ytId) return { type: "youtube", id: ytId };
 
-      const ttId = extractTiktokId(url);
+      const ttId = extractTiktokId(clean);
       if (ttId) return { type: "tiktok", id: ttId };
 
-      if (url) return { type: "link", url: url };
+      if (clean) return { type: "link", url: clean };
       return null;
     }
 
@@ -114,7 +126,12 @@
         let mediaHtml = "";
 
         if (video?.type === "youtube") {
-          mediaHtml = `<iframe src="${video.embed}" allowfullscreen></iframe>`;
+          // Vista previa con miniatura real + clic para reproducir (más rápido que N iframes)
+          mediaHtml = `
+            <div class="video-thumb" data-yt="${video.id}" title="Reproducir video">
+              <img src="https://i.ytimg.com/vi/${video.id}/hqdefault.jpg" alt="Vista previa del video" loading="lazy" onerror="this.style.display='none'">
+              <div class="play-btn">▶</div>
+            </div>`;
         } else if (video?.type === "tiktok") {
           mediaHtml = `
             <a href="${v.url_youtube}" target="_blank" style="display: block; text-decoration: none;">
@@ -125,12 +142,14 @@
               </div>
             </a>`;
         } else if (video?.type === "link") {
+          let host = "";
+          try { host = new URL(video.url).hostname.replace(/^www\./, ""); } catch {}
           mediaHtml = `
             <a href="${video.url}" target="_blank" style="display: block; text-decoration: none;">
               <div style="height: 200px; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #333; gap: 0.5rem;">
                 <div style="font-size: 3rem;">▶️</div>
                 <div style="font-weight: 600;">Ver video</div>
-                <div style="font-size: 0.8rem; color: #888;">Toca para abrir enlace</div>
+                <div style="font-size: 0.8rem; color: #888;">${host ? "Abrir en " + host : "Toca para abrir enlace"}</div>
               </div>
             </a>`;
         } else {
@@ -152,6 +171,18 @@
     }
 
     loadVideos();
+
+    // Clic en la miniatura → reemplaza por el reproductor real (autoplay)
+    document.getElementById("videos-grid").addEventListener("click", (e) => {
+      const t = e.target.closest(".video-thumb");
+      if (!t) return;
+      const id = t.dataset.yt;
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+      iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+      iframe.allowFullscreen = true;
+      t.replaceWith(iframe);
+    });
   </script>
   <script src="/js/chat.js"></script>
 </body>
