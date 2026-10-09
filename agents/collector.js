@@ -50,6 +50,36 @@ function extractLinks(html, baseUrl) {
   return out.filter((l) => (seen.has(l.href) ? false : (seen.add(l.href), true)));
 }
 
+// Palabras que delatan documentos administrativos (NO son material de estudio)
+const EXCLUIR = [
+  "reglamento", "politica de gestion", "política de gestión", "sgc-", "sgsi-",
+  "terminos de servicio", "términos", "uso de datos", "encuesta", "opinion",
+  "diptico", "díptico", "triptico", "tríptico", "brochure", "flyer",
+  "convenio", "becas", "intercambio", "ranking", "calendario academico",
+  "organigrama", "directorio", "transparencia", "libro de reclamaciones",
+  "politica de privacidad", "aviso legal", "cookies",
+];
+
+function esBasura(link) {
+  const blob = `${link.href} ${link.texto}`.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return EXCLUIR.some((k) => blob.includes(k));
+}
+
+// Puntaje de calidad: prioriza solucionarios, exámenes resueltos,
+// prospectos, temarios y modelos oficiales
+function puntajeCalidad(link) {
+  const b = `${link.href} ${link.texto}`.toLowerCase();
+  let p = 0;
+  if (/solucionario|resuelto/.test(b)) p += 5;
+  if (/examen.*(pasado|ordinario|admision)|banco.*preguntas/.test(b)) p += 4;
+  if (/prospecto|temario/.test(b)) p += 4;
+  if (/modelo|simulacro/.test(b)) p += 3;
+  if (/\.pdf(\?|$)/i.test(link.href)) p += 1;
+  if (link.texto.length < 4) p -= 3;
+  return p;
+}
+
 function esMaterialUtil(link) {
   const blob = `${link.href} ${link.texto}`.toLowerCase();
   const esPdf = /\.pdf(\?|$)/i.test(link.href);
@@ -89,9 +119,11 @@ function inferirMateria(link, materiasUni) {
 async function recolectarUniversidad(uni, opts = {}) {
   const visitas = [];
   const hallazgos = [];
+  // Solo fuentes propias: evita hallazgos cruzados (ej. links UNMSM en ficha UNI)
   const urls = [...uni.fuentes.map((f) => f.url)];
-  if (opts.incluirRepos !== false) {
-    for (const r of REPOSITORIOS_PUBLICOS) if (!urls.includes(r)) urls.push(r);
+  if (opts.incluirRepos === true) {
+    const { REPOSITORIOS_PUBLICOS: REPOS } = require("./config.cjs");
+    for (const r of REPOS) if (!urls.includes(r)) urls.push(r);
   }
   const limit = opts.maxPages || 8;
   for (const url of urls.slice(0, limit)) {
@@ -100,6 +132,7 @@ async function recolectarUniversidad(uni, opts = {}) {
     if (!r.ok) continue;
     const links = extractLinks(r.html, url);
     for (const l of links) {
+      if (esBasura(l)) continue;
       const ev = esMaterialUtil(l);
       if (!ev.util) continue;
       hallazgos.push({
@@ -110,13 +143,16 @@ async function recolectarUniversidad(uni, opts = {}) {
         tipo: inferirTipo(l),
         materia_sugerida: inferirMateria(l, uni.materias),
         evidencia: ev.razon,
+        calidad: puntajeCalidad(l),
         fecha_hallazgo: new Date().toISOString(),
       });
     }
   }
-  // dedup por url_pdf
+  // dedup por url_pdf y orden por calidad
   const seen = new Set();
-  const unicos = hallazgos.filter((h) => (seen.has(h.url_pdf) ? false : (seen.add(h.url_pdf), true)));
+  const unicos = hallazgos
+    .filter((h) => (seen.has(h.url_pdf) ? false : (seen.add(h.url_pdf), true)))
+    .sort((a, b) => b.calidad - a.calidad);
   return { universidad: uni.id, visitas, hallazgos: unicos.slice(0, 60), total: unicos.length };
 }
 
