@@ -152,6 +152,7 @@
                 <button class="tab-btn" data-tab="examenes" onclick="showTab('examenes')">📝 Exámenes</button>
                 <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
                 <button class="tab-btn" data-tab="avance" onclick="showTab('avance')">📊 Mi Avance</button>
+                <button class="tab-btn" data-tab="tutor" onclick="showTab('tutor')">🤖 Tutor</button>
                 <button class="tab-btn" data-tab="materiales" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
@@ -181,6 +182,30 @@
                     <p style="color:#888; font-size:0.88rem; margin-bottom:0.8rem;">Tus preguntas falladas. Repasa cada una a los 3, 7 y 15 días: es lo que más sube tu nota.</p>
                     <div class="filter-bar" id="errores-filter"></div>
                     <div id="avance-errores"></div>
+                </div>
+            </div>
+
+            <div id="tab-tutor" class="tab-content">
+                <div class="content-card" style="border-left:4px solid #00c896;">
+                    <h3>🤖 Tu tutor personal <span id="tutor-uni" style="color:#00a37a;"></span></h3>
+                    <p style="color:#666; font-size:0.9rem;">Conoce tu nivel, tus errores y el temario de tu universidad. Elige cómo quieres aprender hoy:</p>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.8rem 0;" id="tutor-modos">
+                        <button class="filter-btn active" data-modo="explicar" onclick="tutorSetModo('explicar', this)">📖 Explícame</button>
+                        <button class="filter-btn" data-modo="practicar" onclick="tutorSetModo('practicar', this)">✏️ Practicar</button>
+                        <button class="filter-btn" data-modo="socratico" onclick="tutorSetModo('socratico', this)">❓ Descubrir</button>
+                        <button class="filter-btn" data-modo="errores" onclick="tutorSetModo('errores', this)">🔁 Mis errores</button>
+                    </div>
+                    <div id="tutor-tema-line" style="display:none; background:#f0faf7; border-radius:8px; padding:0.5rem 0.8rem; font-size:0.88rem; margin-bottom:0.6rem;">
+                        Tema: <strong id="tutor-tema"></strong> <span style="color:#00a37a; cursor:pointer; margin-left:0.5rem;" onclick="tutorClearTema()">✕ quitar</span>
+                    </div>
+                    <div id="tutor-login-hint" style="display:none; background:#fff8e6; border-radius:8px; padding:0.5rem 0.8rem; font-size:0.85rem; margin-bottom:0.6rem;">
+                        👉 <a href="#" onclick="showTab('simulacro'); return false;" style="color:#ff6b6b; font-weight:bold;">Inicia sesión</a> para que el tutor conozca tu nivel y tus errores.
+                    </div>
+                    <div id="tutor-msgs" style="max-height:380px; overflow-y:auto; display:flex; flex-direction:column; gap:0.6rem; margin-bottom:0.8rem;"></div>
+                    <div style="display:flex; gap:0.5rem;">
+                        <input id="tutor-input" placeholder="Escribe tu duda o tema..." style="flex:1; padding:0.7rem 1rem; border:2px solid #e0e0e0; border-radius:25px; font-size:0.95rem; outline:none;" onkeydown="if(event.key==='Enter')tutorEnviar()">
+                        <button class="btn btn-primary" id="tutor-send" onclick="tutorEnviar()" style="border-radius:50%; width:46px; height:46px; padding:0; border-color:#00c896; background:#00c896;">➤</button>
+                    </div>
                 </div>
             </div>
 
@@ -307,6 +332,7 @@
             if (target) target.classList.add("active");
             if (tab === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
             if (tab === "avance" && window._loadMiAvance) window._loadMiAvance();
+            if (tab === "tutor" && window._initTutor) window._initTutor();
         };
         window._selectedUni = "UNI";
 
@@ -531,7 +557,8 @@
             items.forEach(renderFn);
         }
 
-        function renderTemario(item) {
+        function renderTemario(item, idx, arr) {
+            if (arr) window._temarioCache = arr;
             const list = document.getElementById("temarios-list");
             const card = document.createElement("div");
             card.className = "content-card";
@@ -540,7 +567,8 @@
                 <span class="badge-tag">${item.curso || ""}</span>
                 <span class="badge-tag green">${item.universidad || "UNI"}</span>
                 <span class="toggle-btn" onclick="this.parentElement.classList.toggle('expanded')">Ver contenido ▼</span>
-                <div class="contenido">${item.contenido || ""}</div>`;
+                <div class="contenido">${item.contenido || ""}</div>
+                <div><button class="filter-btn" style="margin-top:0.6rem;" onclick="tutorEstudiar(window._temarioCache[${idx}].titulo, 'explicar')">🤖 Estudiar este tema con el Tutor</button></div>`;
             list.appendChild(card);
         }
 
@@ -1341,11 +1369,12 @@
                 fbar.appendChild(b);
             });
             const list = items.filter(e => area === "Todas" || (e.area || "General") === area);
+            window._erroresVisibles = list;
             if (!list.length) {
                 box.innerHTML = '<div class="content-card"><p style="text-align:center; color:#00a37a;">🎉 Sin errores pendientes aquí. ¡Sigue así!</p></div>';
                 return;
             }
-            box.innerHTML = list.map(e => {
+            box.innerHTML = list.map((e, ei) => {
                 const dias = Math.floor((Date.now() - new Date(e.fecha).getTime()) / 86400000);
                 const rep = repasadas.has(e.vista_id);
                 const badge = rep
@@ -1365,7 +1394,10 @@
                     <p style="color:#333; margin-bottom:0.4rem;"><strong>${escAv(e.texto)}</strong></p>
                     ${opts}
                     ${e.explicacion ? `<p style="color:#666; font-size:0.85rem; font-style:italic; margin-top:0.4rem;">${escAv(e.explicacion)}</p>` : ""}
-                    <button class="filter-btn" style="margin-top:0.5rem;" onclick="toggleRepasada('${e.vista_id}')">${rep ? "Marcar sin repasar" : "Marcar repasada"}</button>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                        <button class="filter-btn" onclick="toggleRepasada('${e.vista_id}')">${rep ? "Marcar sin repasar" : "Marcar repasada"}</button>
+                        <button class="filter-btn" onclick="tutorEstudiar(window._erroresVisibles[${ei}].texto, 'errores')">🤖 Que el tutor me lo explique</button>
+                    </div>
                 </div>`;
             }).join("");
         }
@@ -1502,6 +1534,107 @@
             window._ultimosErrores = errores;
             renderErrores(errores);
         }
+
+        // === TUTOR ADAPTATIVO ===
+        window._tutorModo = "explicar";
+        window._tutorTema = "";
+        window._tutorHist = [];
+        window._tutorSaludado = false;
+
+        function tutorUni() { return window._selectedUni || "UNI"; }
+        function tutorKey() { return "area52_tutor_" + tutorUni(); }
+
+        window.tutorSetModo = function(modo, btn) {
+            window._tutorModo = modo;
+            document.querySelectorAll("#tutor-modos .filter-btn").forEach(b => b.classList.remove("active"));
+            if (btn) btn.classList.add("active");
+        };
+        window.tutorClearTema = function() {
+            window._tutorTema = "";
+            document.getElementById("tutor-tema-line").style.display = "none";
+        };
+        function tutorLoadHist() {
+            try { window._tutorHist = JSON.parse(localStorage.getItem(tutorKey()) || "[]").slice(-20); }
+            catch { window._tutorHist = []; }
+        }
+        function tutorSaveHist() {
+            try { localStorage.setItem(tutorKey(), JSON.stringify(window._tutorHist.slice(-20))); } catch {}
+        }
+        function tutorPinta(texto, quien) {
+            const box = document.getElementById("tutor-msgs");
+            const div = document.createElement("div");
+            const esUser = quien === "user";
+            div.style.cssText = esUser
+                ? "align-self:flex-end; max-width:85%; padding:0.7rem 1rem; border-radius:12px 12px 4px 12px; background:#00c896; color:white; font-size:0.92rem; line-height:1.55;"
+                : "align-self:flex-start; max-width:92%; padding:0.8rem 1rem; border-radius:12px 12px 12px 4px; background:white; border:1px solid #e8e8e8; font-size:0.92rem; line-height:1.65; box-shadow:0 1px 4px rgba(0,0,0,0.06);";
+            div.innerHTML = miniMd(texto);
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        window._initTutor = function() {
+            document.getElementById("tutor-uni").textContent = "· " + tutorUni();
+            document.getElementById("tutor-login-hint").style.display = window._studentUser ? "none" : "block";
+            if (window._tutorSaludado) return;
+            window._tutorSaludado = true;
+            tutorLoadHist();
+            window._tutorHist.forEach(m => tutorPinta(m.content, m.role === "user" ? "user" : "bot"));
+            if (!window._tutorHist.length) {
+                tutorPinta(`¡Hola! Soy tu **tutor personal** para **${tutorUni()}** 🎓\n\n${window._studentUser ? "Ya conozco tu nivel y tus errores, así que adaptaré cada clase a ti." : "Si inicias sesión, conoceré tu nivel y adaptaré cada clase a ti."}\n\nDime qué tema quieres dominar hoy, o pulsa **✏️ Practicar** y empezamos.`);
+            }
+        };
+        // Entrada externa: temarios y cuaderno de errores
+        window.tutorEstudiar = function(tema, modo) {
+            window._tutorTema = String(tema || "").slice(0, 120);
+            if (modo) window.tutorSetModo(modo, document.querySelector(`#tutor-modos [data-modo="${modo}"]`));
+            document.getElementById("tutor-tema").textContent = window._tutorTema;
+            document.getElementById("tutor-tema-line").style.display = "block";
+            window.showTab("tutor");
+            window._initTutor();
+            const prompts = {
+                explicar: `Explícame el tema: ${window._tutorTema}`,
+                practicar: `Quiero practicar: ${window._tutorTema}. Dame el primer ejercicio.`,
+                socratico: `Ayúdame a descubrir por mí mismo: ${window._tutorTema}`,
+                errores: `Fallo mucho en: ${window._tutorTema}. Re-enséñamelo con ejemplos nuevos.`
+            };
+            tutorEnviar(prompts[window._tutorModo] || prompts.explicar);
+        };
+        window.tutorEnviar = async function(textoForzado) {
+            const input = document.getElementById("tutor-input");
+            const texto = (textoForzado || input.value || "").trim();
+            if (!texto) return;
+            input.value = "";
+            tutorPinta(texto, "user");
+            const btn = document.getElementById("tutor-send");
+            btn.disabled = true;
+            const pensando = document.createElement("div");
+            pensando.style.cssText = "align-self:flex-start; color:#888; font-size:0.88rem;";
+            pensando.textContent = "Tu tutor está pensando...";
+            document.getElementById("tutor-msgs").appendChild(pensando);
+            try {
+                const email = await resolveStudentEmail();
+                const res = await fetch("/api/tutor", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        estudiante_email: email,
+                        nombre: window._studentNombre || "Estudiante",
+                        universidad: tutorUni(),
+                        modo: window._tutorModo,
+                        tema: window._tutorTema,
+                        mensaje: texto,
+                        historial: window._tutorHist.slice(-10)
+                    })
+                });
+                const data = await res.json();
+                pensando.remove();
+                if (!res.ok) throw new Error(data.error || "Error del tutor");
+                tutorPinta(data.respuesta, "bot");
+                window._tutorHist.push({ role: "user", content: texto }, { role: "assistant", content: data.respuesta });
+                tutorSaveHist();
+            } catch (e) {
+                pensando.remove();
+                tutorPinta("⚠️ No pude responder ahora. Revisa tu conexión e intenta de nuevo.", "bot");
+            } finally { btn.disabled = false; }
+        };
 
         if (window._selectedUni === "UNI") {
             document.getElementById("tab-btn-simulacro").style.display = "inline-block";
