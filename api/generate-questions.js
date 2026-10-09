@@ -151,6 +151,21 @@ function filtrarLote(candidatas, banco, refsExtra) {
   return { nuevas, repetidas };
 }
 
+// Auditoría anti-trampa: si la IA etiqueta "alta" una pregunta que por su
+// forma es fácil (texto muy corto o sin pasos de resolución), se degrada a
+// "media" para que las estadísticas sean honestas y dispare el refuerzo.
+function auditarNivel(preguntas) {
+  return (preguntas || []).map((q) => {
+    const norm = normalizarTexto(q.texto);
+    const pasos = Array.isArray(q.pasos) ? q.pasos.filter((p) => String(p).length > 8) : [];
+    const sospechosa = norm.length < 90 || (pasos.length < 2 && norm.length < 140);
+    if (sospechosa && (q.dificultad || "alta") === "alta") {
+      return { ...q, dificultad: "media", _degradada: true };
+    }
+    return q;
+  });
+}
+
 async function guardarBanco(universidad, nuevas) {
   if (!nuevas.length) return;
   const key = SUPABASE_SERVICE || SUPABASE_ANON;
@@ -471,7 +486,7 @@ REGLAS:
     }
 
     // --- Refuerzo de nivel: si menos del 50% salió alta, tanda extra SOLO altas ---
-    let final = acumuladas.slice(0, objetivo);
+    let final = auditarNivel(acumuladas.slice(0, objetivo));
     const cuentaAltas = (arr) => arr.filter((q) => (q.dificultad || "alta") === "alta").length;
     if (cuentaAltas(final) / Math.max(1, final.length) < 0.5) {
       const faltan = Math.min(Math.ceil(objetivo * 0.8) - cuentaAltas(final), 20);
@@ -486,7 +501,8 @@ REGLAS:
             [...banco.normas.slice(-30), ...final.map((a) => a.texto_norm)].map((t) => String(t).slice(0, 120))
           );
           if (loteNivel) {
-            const { nuevas } = filtrarLote(loteNivel, banco, excludeNorms);
+            const { nuevas: _nl } = filtrarLote(loteNivel, banco, excludeNorms);
+            const nuevas = auditarNivel(_nl);
             const altasNuevas = nuevas.filter((q) => (q.dificultad || "alta") === "alta");
             let k = 0;
             final = final.map((q) =>
