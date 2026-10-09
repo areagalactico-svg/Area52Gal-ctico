@@ -367,8 +367,8 @@ FORMATO JSON VÁLIDO (sin markdown, sin backticks):
       "respuestaCorrecta": 0,
       "area": "PE1/PE2/PE3",
       "subtema": "Subtema específico",
-      "dificultad": "alta/media",
-      "pasos": ["paso 1 de resolución", "paso 2 de resolución"],
+      "dificultad": "alta",
+      "pasos": ["paso 1 de resolución", "paso 2 de resolución", "paso 3 de resolución"],
       "explicacion": "Breve explicación"
     }
   ]
@@ -390,8 +390,12 @@ REGLAS:
 - El examen IEN usa 5 opciones (A-E)
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
-- DIFICULTAD OBLIGATORIA: 0% fáciles, 20% medias, 80% altas. Marca cada una en "dificultad".
+- DIFICULTAD OBLIGATORIA: 100% altas. 0% medias, 0% fáciles. Marca cada una en "dificultad": "alta".
 - PROHIBIDO: preguntas de un solo paso, cálculo directo (ej. "¿Cuánto es 2+2?"), definiciones de memoria ("¿Qué es...?"), textos de menos de 80 palabras en comprensión lectora, sucesiones aritméticas obvias.
+- APLICACIÓN DIRECTA PROHIBIDA: si se resuelve con una sola fórmula o una sola observación, NO es alta. Ejemplos de nivel MEDIO que debes ELEVAR (no los copies, úsalos como piso mínimo):
+  * "Si log2(x) + log2(x-2) = 3, halle x^2 - 2x" → MEDIO (colapsa en una observación). Versión ALTA: agrega parámetro k, condición de existencia y descarte de raíces extrañas, o combina con inecuación.
+  * "Triángulo rectángulo de hipotenusa 13 y cateto 5, halle sen(2θ)" → MEDIO (fórmula directa sobre terna notable). Versión ALTA: el triángulo debe deducirse de una condición previa (semejanza, área dada, trazo auxiliar) antes de aplicar ángulo doble.
+  Regla de oro: el estudiante debe ATASCARSE al menos una vez y necesitar un insight intermedio (despeje no obvio, trazo auxiliar, cambio de variable, descarte de casos, interpretación de un dato oculto).
 - Cada pregunta "alta" DEBE exigir 2 o más conceptos combinados y tener al menos 3 pasos de resolución (lista los pasos en "pasos"). Si no llega a 3 pasos, no es alta: elévala.
 - Distractores trampa: cada distractor debe corresponder a un ERROR TÍPICO real (signo cambiado, fórmula a medias, lectura parcial del texto, confundir área con perímetro, olvidar el reactivo limitante, etc.).
 - Números no triviales: evita resultados enteros obvios; usa fracciones, radicales y decimales como el examen real.
@@ -485,11 +489,11 @@ REGLAS:
       return res.status(502).json({ error: "Could not parse AI response" });
     }
 
-    // --- Refuerzo de nivel: si menos del 50% salió alta, tanda extra SOLO altas ---
+    // --- Refuerzo de nivel: si menos del 85% salió alta, tanda extra SOLO altas ---
     let final = auditarNivel(acumuladas.slice(0, objetivo));
     const cuentaAltas = (arr) => arr.filter((q) => (q.dificultad || "alta") === "alta").length;
-    if (cuentaAltas(final) / Math.max(1, final.length) < 0.5) {
-      const faltan = Math.min(Math.ceil(objetivo * 0.8) - cuentaAltas(final), 20);
+    if (cuentaAltas(final) / Math.max(1, final.length) < 0.85) {
+      const faltan = Math.min(objetivo - cuentaAltas(final) + 5, 25);
       if (faltan > 0) {
         try {
           const loteNivel = await llamarIA(
