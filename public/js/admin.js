@@ -752,6 +752,17 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       }
     } catch(e) {}
 
+    try {
+      const { data: temarios } = await supabase.from("temarios")
+        .select("titulo, contenido")
+        .eq("universidad", "UNI");
+      if (temarios && temarios.length > 0) {
+        temarios.forEach(t => {
+          if (t.contenido) context += `\n\n=== TEMARIO: ${t.titulo} ===\n${t.contenido}`;
+        });
+      }
+    } catch(e) {}
+
     const res = await fetch("/api/generate-questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -780,7 +791,8 @@ window.generateSimulacroQuestions = async function(simulacroId) {
         alert("Error al guardar las preguntas: " + updateError.message);
       } else {
         const extra = data.repetidas_filtradas ? ` (${data.repetidas_filtradas} repetidas filtradas automáticamente)` : "";
-        alert(`Se generaron ${data.preguntas.length} preguntas nuevas sin repetición${extra}!`);
+        const nivelTxt = data.nivel ? ` · Nivel: ${data.nivel.pct_altas}% altas (${data.nivel.altas}/${data.preguntas.length})` : "";
+        alert(`Se generaron ${data.preguntas.length} preguntas nuevas sin repetición${extra}${nivelTxt}!`);
         loadAllData();
       }
     } else {

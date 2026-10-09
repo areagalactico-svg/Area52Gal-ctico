@@ -165,6 +165,8 @@ async function guardarBanco(universidad, nuevas) {
     numeros: q.nums || "",
     area: q.area || "",
     subtema: q.subtema || "",
+    materia: q.subtema || q.area || "General",
+    dificultad: q.dificultad === "media" ? "media" : "alta",
     explicacion: String(q.explicacion || "").slice(0, 1000),
   }));
   try {
@@ -350,6 +352,8 @@ FORMATO JSON VÁLIDO (sin markdown, sin backticks):
       "respuestaCorrecta": 0,
       "area": "PE1/PE2/PE3",
       "subtema": "Subtema específico",
+      "dificultad": "alta/media",
+      "pasos": ["paso 1 de resolución", "paso 2 de resolución"],
       "explicacion": "Breve explicación"
     }
   ]
@@ -367,14 +371,27 @@ ESTRUCTURA DEL EXAMEN IEN (65 preguntas total, 3 horas):
   * Humanidades y Cultura General (6): Literatura, Historia, Geografía
 
 REGLAS:
-- Nivel: Estudiantes de 5to de secundaria (16-18 años) - EXÁMENES DE ALTA DIFICULTAD tipo concurso de admisión UNI
+- Nivel: examen de admisión UNI (el más exigente del Perú). Un postulante promedio resuelve MENOS del 40%: calibra así.
 - El examen IEN usa 5 opciones (A-E)
 - respuestaCorrecta es el índice (0-4) de la opción correcta
 - Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
-- DIFICULTAD ALTA: 0% fáciles, 30% medias, 70% difíciles/muy difíciles
-- Las preguntas deben requerir razonamiento profundo, análisis de múltiples pasos y conocimiento especializado
-- Incluye preguntas trampa: opciones distractores plausibles que confundan al no dominar el tema
-- Evita preguntas de memoria directa; prioriza aplicación, análisis y síntesis
+- DIFICULTAD OBLIGATORIA: 0% fáciles, 20% medias, 80% altas. Marca cada una en "dificultad".
+- PROHIBIDO: preguntas de un solo paso, cálculo directo (ej. "¿Cuánto es 2+2?"), definiciones de memoria ("¿Qué es...?"), textos de menos de 80 palabras en comprensión lectora, sucesiones aritméticas obvias.
+- Cada pregunta "alta" DEBE exigir 2 o más conceptos combinados y tener al menos 3 pasos de resolución (lista los pasos en "pasos"). Si no llega a 3 pasos, no es alta: elévala.
+- Distractores trampa: cada distractor debe corresponder a un ERROR TÍPICO real (signo cambiado, fórmula a medias, lectura parcial del texto, confundir área con perímetro, olvidar el reactivo limitante, etc.).
+- Números no triviales: evita resultados enteros obvios; usa fracciones, radicales y decimales como el examen real.
+- Por área, exige esto:
+  * Aritmética/Álgebra: combina 2 temas (ej. divisibilidad + ecuaciones; funciones + desigualdades).
+  * Geometría/Trigonometría: exige trazo auxiliar, semejanza o identidad no inmediata.
+  * Física: combina 2 principios (ej. dinámica + trabajo-energía; hidrostática + empuje con densidades compuestas).
+  * Química: estequiometría con reactivo limitante o impurezas; nada de preguntas de completar la tabla periódica.
+  * Razonamiento Matemático: juegos lógicos de 4+ condiciones o conteo con casos múltiples, no series de +2.
+  * Razonamiento Verbal: textos densos de 150+ palabras con inferencia (nada literal), analogías de 2do orden.
+  * Humanidades: pregunta relacional (causa-efecto, compara autores/hechos), no fechas sueltas de memoria.
+- ANCLAS DE NIVEL (iguala o supera esta dificultad):
+  * Álgebra: "Si x + 1/x = 4, calcule x^4 + 1/x^4" (exige ver el cuadrado iterado, no reemplazo directo).
+  * Geometría: hallar un área sombreada que obliga a restar sectores y usar semejanza antes de operar.
+  * Física: un bloque que desliza por un plano inclinado con fricción y luego comprime un resorte: pide la compresión máxima (dinámica + energía + condición de equilibrio).
 - SI HAY GUÍA DEL ADMINISTRADOR: usa el estilo y nivel de dificultad como referencia
 - NO repitas conceptos entre preguntas
 - CADA PREGUNTA DEBE SER ÚNICA: varía datos numéricos, contextos y enfoques aunque el subtema se repita`;
@@ -453,14 +470,44 @@ REGLAS:
       return res.status(502).json({ error: "Could not parse AI response" });
     }
 
+    // --- Refuerzo de nivel: si menos del 50% salió alta, tanda extra SOLO altas ---
+    let final = acumuladas.slice(0, objetivo);
+    const cuentaAltas = (arr) => arr.filter((q) => (q.dificultad || "alta") === "alta").length;
+    if (cuentaAltas(final) / Math.max(1, final.length) < 0.5) {
+      const faltan = Math.min(Math.ceil(objetivo * 0.8) - cuentaAltas(final), 20);
+      if (faltan > 0) {
+        try {
+          const loteNivel = await llamarIA(
+            API_KEY,
+            systemPrompt + "\n\nREFUERZO DE NIVEL OBLIGATORIO: tu tanda anterior salió demasiado fácil. En esta tanda genera ÚNICAMENTE preguntas de dificultad ALTA nivel examen real UNI (multi-paso, distractores trampa, números no triviales). Marca todas con \"dificultad\": \"alta\".",
+            topic,
+            faltan,
+            context,
+            [...banco.normas.slice(-30), ...final.map((a) => a.texto_norm)].map((t) => String(t).slice(0, 120))
+          );
+          if (loteNivel) {
+            const { nuevas } = filtrarLote(loteNivel, banco, excludeNorms);
+            const altasNuevas = nuevas.filter((q) => (q.dificultad || "alta") === "alta");
+            let k = 0;
+            final = final.map((q) =>
+              (q.dificultad || "alta") !== "alta" && k < altasNuevas.length ? altasNuevas[k++] : q
+            );
+            acumuladas.push(...altasNuevas.slice(k));
+          }
+        } catch {}
+      }
+    }
+
     await guardarBanco(universidad, acumuladas);
 
-    const limpias = acumuladas.slice(0, objetivo).map(({ texto_norm, hash, optsHash, nums, ...q }) => q);
+    const limpias = final.map(({ texto_norm, hash, optsHash, nums, ...q }) => q);
+    const nAltas = cuentaAltas(limpias);
     return res.status(200).json({
       preguntas: limpias,
       total: limpias.length,
       solicitadas: objetivo,
       repetidas_filtradas: repetidasTotal,
+      nivel: { altas: nAltas, medias: limpias.length - nAltas, pct_altas: Math.round((nAltas / Math.max(1, limpias.length)) * 100) },
     });
   } catch (error) {
     console.error("Generate questions error:", error);

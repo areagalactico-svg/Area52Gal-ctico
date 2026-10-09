@@ -682,6 +682,17 @@
                 }
             } catch (e) {}
 
+            try {
+                const { data: temarios } = await supabase.from("temarios")
+                    .select("titulo, contenido")
+                    .eq("universidad", "UNI");
+                if (temarios && temarios.length > 0) {
+                    temarios.forEach(t => {
+                        if (t.contenido) contextParts.push(`=== TEMARIO: ${t.titulo} ===\n${t.contenido}`);
+                    });
+                }
+            } catch (e) {}
+
             return contextParts.join("\n\n");
         }
 
