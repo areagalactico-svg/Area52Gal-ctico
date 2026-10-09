@@ -190,6 +190,29 @@ async function cargarGuias() {
   });
 }
 
+/* ---------- BANCO DE PREGUNTAS (cobertura anti-repetición) ---------- */
+
+async function cargarBancoStats() {
+  const box = document.getElementById("banco-stats");
+  if (!box) return;
+  try {
+    const { data, error } = await supabase.from("banco_preguntas").select("universidad, area").limit(5000);
+    if (error) {
+      box.innerHTML = `<p style="color:#888; font-size:0.85rem;">Banco de preguntas: ejecuta <code>supabase-banco-preguntas.sql</code> para activar la anti-repetición.</p>`;
+      return;
+    }
+    const porUni = {};
+    (data || []).forEach((b) => { porUni[b.universidad || "UNI"] = (porUni[b.universidad || "UNI"] || 0) + 1; });
+    const total = (data || []).length;
+    const chips = Object.entries(porUni).map(([u, n]) => `<span style="background:#e8f5e9; color:#2e7d32; padding:0.25rem 0.7rem; border-radius:20px; font-size:0.8rem; font-weight:600;">${escapeHtml(u)}: ${n}</span>`).join(" ");
+    box.innerHTML = `<div class="card" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+      <strong>📚 Banco: ${total} preguntas únicas</strong>${chips}
+      <span style="color:#888; font-size:0.8rem;">Las nuevas generaciones descartan duplicados automáticamente.</span></div>`;
+  } catch {
+    box.innerHTML = "";
+  }
+}
+
 /* ---------- INIT ---------- */
 document.getElementById("res-simulacro")?.addEventListener("change", cargarResultados);
 document.getElementById("res-buscar")?.addEventListener("input", () => clearTimeout(window.__resT) || (window.__resT = setTimeout(cargarResultados, 300)));
@@ -201,5 +224,5 @@ document.querySelectorAll('.tab-btn[data-tab="resultados"]').forEach((b) => b.ad
   if (!RES_SIMULACROS.length) await cargarSimulacrosParaFiltro();
   cargarResultados(); cargarGuias();
 }));
-document.querySelectorAll('.tab-btn[data-tab="agentes"]').forEach((b) => b.addEventListener("click", cargarGuias));
+document.querySelectorAll('.tab-btn[data-tab="agentes"]').forEach((b) => b.addEventListener("click", () => { cargarGuias(); cargarBancoStats(); }));
 cargarSimulacrosParaFiltro();

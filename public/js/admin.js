@@ -760,7 +760,8 @@ window.generateSimulacroQuestions = async function(simulacroId) {
         type: "simulacro",
         count: 65,
         context: context,
-        universidad: simulacro.universidad || "UNI"
+        universidad: simulacro.universidad || "UNI",
+        exclude_texts: (simulacro.preguntas || []).map(q => q.texto)
       })
     });
 
@@ -778,8 +779,11 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       if (updateError) {
         alert("Error al guardar las preguntas: " + updateError.message);
       } else {
-        const extra = data.repetidas_filtradas ? ` (${data.repetidas_filtradas} repetidas filtradas automáticamente)` : "";
-        alert(`Se generaron ${data.preguntas.length} preguntas nuevas sin repetición${extra}!`);
+        alert(`Se generaron ${data.preguntas.length} preguntas correctamente!`);
+        if (data.meta) {
+          const dup = (data.meta.duplicadas_en_lote || 0) + (data.meta.duplicadas_exactas_banco || 0) + (data.meta.duplicadas_similares_banco || 0);
+          if (dup > 0) alert(`${dup} pregunta(s) duplicada(s) fueron descartadas automáticamente.`);
+        }
         loadAllData();
       }
     } else {
