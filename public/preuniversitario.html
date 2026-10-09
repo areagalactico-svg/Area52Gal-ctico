@@ -725,6 +725,31 @@
             _simulacroRefreshInterval = setInterval(loadSimulacrosIEN, 60000);
         };
 
+        // === MEMORIA ANTI-REPETICIÓN: qué preguntas ya vio el estudiante ===
+        // Misma normalización que el servidor (api/generate-questions.js)
+        function normPregunta(s) {
+            return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+        }
+        function leerVistas(uni) {
+            try {
+                const todas = JSON.parse(localStorage.getItem("area52_vistas") || "{}");
+                return Array.isArray(todas[uni]) ? todas[uni] : [];
+            } catch { return []; }
+        }
+        function registrarVistas(uni, preguntas) {
+            try {
+                const todas = JSON.parse(localStorage.getItem("area52_vistas") || "{}");
+                const arr = Array.isArray(todas[uni]) ? todas[uni] : [];
+                const set = new Set(arr);
+                (preguntas || []).forEach((q) => {
+                    const n = normPregunta(q.texto);
+                    if (n.length >= 10) set.add(n);
+                });
+                todas[uni] = Array.from(set).slice(-400); // últimas 400 por universidad
+                localStorage.setItem("area52_vistas", JSON.stringify(todas));
+            } catch {}
+        }
+
         window.generateIEN = async function() {
             const topic = document.getElementById('ai-topic').value;
             let count = parseInt(document.getElementById('ai-count').value);
@@ -744,7 +769,7 @@
                 const email = await resolveStudentEmail();
                 const res = await fetch('/api/generate-questions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic, type: 'simulacro', count, context, universidad: window._selectedUni || 'UNI', estudiante_email: email })
+                    body: JSON.stringify({ topic, type: 'simulacro', count, context, universidad: window._selectedUni || 'UNI', exclude_textos: leerVistas(window._selectedUni || 'UNI').slice(-60), estudiante_email: email })
                 });
                 const data = await res.json();
                 if (res.ok && data.preguntas && data.preguntas.length > 0) {
@@ -767,6 +792,7 @@
             simulacroCurrentTest = data;
             simulacroAnswers = {};
             simulacroStartTime = new Date();
+            registrarVistas(window._selectedUni || data.universidad || "UNI", data.preguntas || []);
             document.getElementById("simulacro-list-area").style.display = "none";
             const testArea = document.getElementById("simulacro-test-area");
             testArea.style.display = "block";
