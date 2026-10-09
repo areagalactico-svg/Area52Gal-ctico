@@ -151,6 +151,7 @@
                 <button class="tab-btn active" data-tab="temarios" onclick="showTab('temarios')">📚 Temarios</button>
                 <button class="tab-btn" data-tab="examenes" onclick="showTab('examenes')">📝 Exámenes</button>
                 <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
+                <button class="tab-btn" data-tab="avance" onclick="showTab('avance')">📊 Mi Avance</button>
                 <button class="tab-btn" data-tab="materiales" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
@@ -167,6 +168,20 @@
             <div id="tab-materiales" class="tab-content">
                 <div class="filter-bar" id="materiales-filter"></div>
                 <div id="materiales-list"></div>
+            </div>
+
+            <div id="tab-avance" class="tab-content">
+                <div id="avance-countdown" style="margin-bottom:1.2rem;"></div>
+                <div id="avance-resumen"></div>
+                <div id="avance-evolucion" style="margin-top:1.2rem;"></div>
+                <div id="avance-areas" style="margin-top:1.2rem;"></div>
+                <div id="avance-guias" style="margin-top:1.2rem;"></div>
+                <div style="margin-top:1.5rem;">
+                    <h3 style="color:#1a1a2e; margin-bottom:0.3rem;">📓 Mi cuaderno de errores</h3>
+                    <p style="color:#888; font-size:0.88rem; margin-bottom:0.8rem;">Tus preguntas falladas. Repasa cada una a los 3, 7 y 15 días: es lo que más sube tu nota.</p>
+                    <div class="filter-bar" id="errores-filter"></div>
+                    <div id="avance-errores"></div>
+                </div>
             </div>
 
             <div id="tab-simulacro" class="tab-content">
@@ -276,10 +291,11 @@
             if (window._filterAndRender) window._filterAndRender();
         };
         window.showTab = function(tab) {
-            if (tab === "simulacro") {
+            if (tab === "simulacro" || tab === "avance") {
                 if (!window._studentUser) {
                     document.getElementById("student-login-modal").style.display = "flex";
                     checkStudentSession();
+                    window._pendingTab = tab;
                     return;
                 }
             }
@@ -290,6 +306,7 @@
             var target = document.getElementById("tab-" + tab);
             if (target) target.classList.add("active");
             if (tab === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+            if (tab === "avance" && window._loadMiAvance) window._loadMiAvance();
         };
         window._selectedUni = "UNI";
 
@@ -338,9 +355,12 @@
                     document.getElementById("student-login-modal").style.display = "none";
                     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
                     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-                    document.querySelector('.tab-btn[data-tab="simulacro"]').classList.add("active");
-                    document.getElementById("tab-simulacro").classList.add("active");
-                    if (window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+                    const _pt = window._pendingTab || "simulacro";
+                    window._pendingTab = null;
+                    document.querySelector('.tab-btn[data-tab="' + _pt + '"]').classList.add("active");
+                    document.getElementById("tab-" + _pt).classList.add("active");
+                    if (_pt === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+                    if (_pt === "avance" && window._loadMiAvance) window._loadMiAvance();
                 }
             } catch(e) {
                 errorEl.textContent = "Error de conexion. Intenta de nuevo.";
@@ -1270,6 +1290,218 @@
             window._ultimoResultado = { state, simId: simulacroCurrentTest.id || null, titulo: simulacroCurrentTest.titulo || "Simulacro" };
             document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(state, lb, email);
         };
+
+        // === MI AVANCE: dashboard del postulante ===
+        let _avanceCountdownInt = null;
+        window._loadMiAvance = function() { cargarMiAvance(); };
+
+        function escAv(s) {
+            return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+        function miniMd(md) {
+            return String(md || "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/^### (.*)$/gm, "<h4 style='color:#1a1a2e; margin:0.8rem 0 0.3rem;'>$1</h4>")
+                .replace(/^## (.*)$/gm, "<h3 style='color:#00a37a; margin:1rem 0 0.4rem;'>$1</h3>")
+                .replace(/^# (.*)$/gm, "<h2 style='color:#1a1a2e;'>$1</h2>")
+                .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                .replace(/^- (.*)$/gm, "<li>$1</li>")
+                .replace(/\n/g, "<br>");
+        }
+        function getRepasadas() {
+            try { return new Set(JSON.parse(localStorage.getItem("area52_repasadas") || "[]")); }
+            catch { return new Set(); }
+        }
+        window.toggleRepasada = function(vistaId) {
+            try {
+                const arr = JSON.parse(localStorage.getItem("area52_repasadas") || "[]");
+                const i = arr.indexOf(vistaId);
+                if (i >= 0) arr.splice(i, 1); else arr.push(vistaId);
+                localStorage.setItem("area52_repasadas", JSON.stringify(arr));
+            } catch {}
+            if (window._ultimosErrores) renderErrores(window._ultimosErrores);
+        };
+        window.filtrarErrores = function(area, btn) {
+            document.querySelectorAll("#errores-filter .filter-btn").forEach(b => b.classList.remove("active"));
+            if (btn) btn.classList.add("active");
+            if (window._ultimosErrores) renderErrores(window._ultimosErrores, area);
+        };
+
+        function renderErrores(items, filtroArea) {
+            const box = document.getElementById("avance-errores");
+            const fbar = document.getElementById("errores-filter");
+            const area = filtroArea || "Todas";
+            const repasadas = getRepasadas();
+            const areas = ["Todas", ...new Set(items.map(e => e.area || "General"))];
+            fbar.innerHTML = "";
+            areas.forEach(a => {
+                const b = document.createElement("button");
+                b.className = "filter-btn" + (a === area ? " active" : "");
+                b.textContent = a;
+                b.onclick = () => window.filtrarErrores(a, b);
+                fbar.appendChild(b);
+            });
+            const list = items.filter(e => area === "Todas" || (e.area || "General") === area);
+            if (!list.length) {
+                box.innerHTML = '<div class="content-card"><p style="text-align:center; color:#00a37a;">🎉 Sin errores pendientes aquí. ¡Sigue así!</p></div>';
+                return;
+            }
+            box.innerHTML = list.map(e => {
+                const dias = Math.floor((Date.now() - new Date(e.fecha).getTime()) / 86400000);
+                const rep = repasadas.has(e.vista_id);
+                const badge = rep
+                    ? '<span class="badge-tag green">✅ Repasada</span>'
+                    : dias >= 3
+                        ? '<span class="badge-tag" style="background:#fde8e8; color:#c0392b;">🔴 Repasar hoy</span>'
+                        : '<span class="badge-tag">🟡 En seguimiento</span>';
+                const opts = (e.opciones || []).map((o, i) =>
+                    `<div style="font-size:0.85rem; padding:0.25rem 0; ${i === e.respuesta_correcta ? "color:#00a37a; font-weight:bold;" : "color:#888;"}>${i === e.respuesta_correcta ? "✔ " : ""}${escAv(o)}</div>`
+                ).join("");
+                return `<div class="content-card">
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.4rem;">
+                        <span class="badge-tag">${escAv(e.area || "General")}</span>
+                        ${e.subtema ? `<span class="badge-tag green">${escAv(e.subtema)}</span>` : ""}
+                        ${badge}
+                    </div>
+                    <p style="color:#333; margin-bottom:0.4rem;"><strong>${escAv(e.texto)}</strong></p>
+                    ${opts}
+                    ${e.explicacion ? `<p style="color:#666; font-size:0.85rem; font-style:italic; margin-top:0.4rem;">${escAv(e.explicacion)}</p>` : ""}
+                    <button class="filter-btn" style="margin-top:0.5rem;" onclick="toggleRepasada('${e.vista_id}')">${rep ? "Marcar sin repasar" : "Marcar repasada"}</button>
+                </div>`;
+            }).join("");
+        }
+
+        async function cargarMiAvance() {
+            const email = await resolveStudentEmail();
+            const uni = window._selectedUni || "UNI";
+            const nombre = window._studentNombre || "Estudiante";
+            const box1 = document.getElementById("avance-countdown");
+            const box2 = document.getElementById("avance-resumen");
+            const box3 = document.getElementById("avance-evolucion");
+            const box4 = document.getElementById("avance-areas");
+            const box5 = document.getElementById("avance-guias");
+            if (!email || email === "anonimo") {
+                [box1, box2, box3, box4, box5].forEach(b => { if (b) b.innerHTML = ""; });
+                document.getElementById("avance-errores").innerHTML = '<div class="content-card"><p style="text-align:center; color:#888;">Inicia sesión para ver tu avance.</p></div>';
+                return;
+            }
+            box2.innerHTML = '<p style="color:#888;">Cargando tu avance...</p>';
+            if (_avanceCountdownInt) { clearInterval(_avanceCountdownInt); _avanceCountdownInt = null; }
+
+            let subs = [];
+            try {
+                const r = await supabase.from("simulacro_submissions").select("*").eq("estudiante_email", email).order("fecha_fin", { ascending: false }).limit(50);
+                subs = r.data || [];
+            } catch {}
+            let proximo = null;
+            try {
+                const r = await supabase.from("simulacros_ien").select("id,titulo,fecha_inicio,duracion").eq("universidad", uni).gt("fecha_inicio", new Date().toISOString()).order("fecha_inicio", { ascending: true }).limit(1);
+                proximo = (r.data || [])[0] || null;
+            } catch {}
+            let guias = [];
+            try {
+                const r = await supabase.from("guias_personalizadas").select("id,universidad,nota,diagnostico,focos,guia_markdown,created_at").eq("estudiante_email", email).order("created_at", { ascending: false }).limit(3);
+                guias = r.data || [];
+            } catch {}
+            let vistas = [];
+            try {
+                const r = await supabase.from("pregunta_vistas").select("id,pregunta_id,simulacro_id,fue_correcta,fecha").eq("estudiante_email", email).eq("fue_correcta", false).order("fecha", { ascending: false }).limit(200);
+                vistas = r.data || [];
+            } catch {}
+            let bancoMap = {};
+            if (vistas.length) {
+                try {
+                    const ids = [...new Set(vistas.map(v => v.pregunta_id))].slice(0, 200);
+                    const r = await supabase.from("banco_preguntas").select("id,texto,opciones,respuesta_correcta,explicacion,area,subtema").in("id", ids);
+                    (r.data || []).forEach(b => { bancoMap[b.id] = b; });
+                } catch {}
+            }
+
+            // --- Cuenta regresiva ---
+            if (proximo && proximo.fecha_inicio) {
+                const fin = new Date(proximo.fecha_inicio).getTime();
+                const fechaStr = new Date(proximo.fecha_inicio).toLocaleString("es-PE", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+                box1.innerHTML = `<div class="content-card" style="border-left:4px solid #00c896; background:#f0faf7; text-align:center;">
+                    <p style="color:#555;">⏳ Tu próximo examen programado: <strong>${escAv(proximo.titulo || "")}</strong> — ${fechaStr}</p>
+                    <p id="avance-cd" style="font-size:2rem; font-weight:bold; color:#1a1a2e;">--</p></div>`;
+                const tick = () => {
+                    const d = fin - Date.now();
+                    const el = document.getElementById("avance-cd");
+                    if (!el) { clearInterval(_avanceCountdownInt); return; }
+                    if (d <= 0) { el.textContent = "¡Es ahora! Ve a Simulacro IEN."; clearInterval(_avanceCountdownInt); return; }
+                    const dd = Math.floor(d / 86400000), hh = Math.floor(d % 86400000 / 3600000), mm = Math.floor(d % 3600000 / 60000), ss = Math.floor(d % 60000 / 1000);
+                    el.textContent = `${dd}d ${String(hh).padStart(2, "0")}h ${String(mm).padStart(2, "0")}m ${String(ss).padStart(2, "0")}s`;
+                };
+                tick();
+                _avanceCountdownInt = setInterval(tick, 1000);
+            } else {
+                box1.innerHTML = `<div class="content-card" style="text-align:center;"><p style="color:#888;">Sin examen programado para ${escAv(uni)} por ahora. <a href="https://wa.me/51933884059" style="color:#ff6b6b; font-weight:bold;">Pregúntanos el cronograma por WhatsApp</a></p></div>`;
+            }
+
+            if (!subs.length) {
+                box2.innerHTML = `<div class="content-card" style="text-align:center;"><h3>Hola, ${escAv(nombre)} 👋</h3><p style="color:#666;">Aún no tienes simulacros registrados. Rinde tu primer simulacro y aquí verás tu evolución, tu nivel por área y tu cuaderno de errores.</p></div>`;
+                box3.innerHTML = ""; box4.innerHTML = "";
+            } else {
+                const notas = subs.map(s => Number(s.nota || 0));
+                const mejor = Math.max(...notas);
+                const prom = notas.reduce((a, b) => a + b, 0) / notas.length;
+                let rankTxt = "";
+                try {
+                    const ultimo = subs[0];
+                    if (ultimo.simulacro_id) {
+                        const lb = await fetchSimulacroLeaderboard(ultimo.simulacro_id, email);
+                        if (lb.rank > 0) rankTxt = ` · 🏆 Puesto N° ${lb.rank} de ${lb.rows.length}`;
+                    }
+                } catch {}
+                box2.innerHTML = `<div class="content-card"><h3>Hola, ${escAv(nombre)} 👋</h3>
+                    <p style="font-size:1.05rem;">${subs.length} simulacro(s) · Mejor nota: <strong style="color:#00a37a;">${mejor.toFixed(1)}/20</strong> · Promedio: <strong>${prom.toFixed(1)}</strong>${rankTxt}</p>
+                    <p style="color:#888; font-size:0.88rem;">${prom >= 14 ? "🔥 En zona de ingreso: afina velocidad y evita errores tontos." : prom >= 11 ? "💪 Base lista: cierra tus áreas rojas para entrar en zona segura." : "🌱 En construcción: prioriza tus 3 focos y repasa tu cuaderno."}</p></div>`;
+
+                const ultimos = [...subs].reverse().slice(-10);
+                box3.innerHTML = `<div class="content-card"><h3>📈 Tu evolución (nota /20)</h3>` +
+                    ultimos.map(s => {
+                        const n = Number(s.nota || 0);
+                        const color = n >= 14 ? "#00c896" : n >= 11 ? "#f39c12" : "#ff6b6b";
+                        return `<div style="display:flex; align-items:center; gap:0.6rem; margin:0.35rem 0;">
+                            <span style="width:52px; font-weight:bold; color:${color};">${n.toFixed(1)}</span>
+                            <div style="flex:1; background:#eee; border-radius:4px; height:12px;"><div style="width:${Math.min(100, n * 5)}%; background:${color}; height:100%; border-radius:4px;"></div></div>
+                        </div>`;
+                    }).join("") + `</div>`;
+
+                const agg = {};
+                subs.forEach(s => {
+                    const ar = s.area_results || {};
+                    for (const [a, d] of Object.entries(ar)) {
+                        agg[a] = agg[a] || { c: 0, t: 0, p: 0 };
+                        agg[a].c += d.correct || 0;
+                        agg[a].t += (d.correct || 0) + (d.wrong || 0) + (d.blank || 0);
+                        agg[a].p += Number(d.puntos || 0);
+                    }
+                });
+                const entries = Object.entries(agg);
+                box4.innerHTML = entries.length ? `<div class="content-card"><h3>🚦 Tu nivel por área</h3>` +
+                    entries.map(([a, d]) => {
+                        const pct = d.t ? Math.round(d.c / d.t * 100) : 0;
+                        const dot = pct >= 70 ? "🟢" : pct >= 45 ? "🟡" : "🔴";
+                        const msg = pct >= 70 ? "dominada" : pct >= 45 ? "en proceso" : "foco urgente";
+                        return `<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid #f0f0f0;">
+                            <span>${dot} <strong>${escAv(a)}</strong> <span style="color:#888;">(${msg})</span></span>
+                            <span style="color:#555;">${d.c}/${d.t} · ${pct}%</span></div>`;
+                    }).join("") + `</div>` : "";
+            }
+
+            // --- Guías ---
+            box5.innerHTML = guias.length ? `<div class="content-card"><h3>📖 Tus guías personalizadas</h3>` +
+                guias.map((g, i) => `<div style="margin-bottom:0.6rem; padding-bottom:0.6rem; border-bottom:1px solid #eee;">
+                    <p><strong>Guía ${escAv(g.universidad || "")}</strong> · nota ${Number(g.nota || 0).toFixed(1)}/20 · ${new Date(g.created_at).toLocaleDateString("es-PE")}
+                    <span class="toggle-btn" onclick="document.getElementById('guia-av-${i}').style.display = document.getElementById('guia-av-${i}').style.display === 'none' ? 'block' : 'none'">Ver ▼</span></p>
+                    <div id="guia-av-${i}" style="display:none; background:#f8f9fa; border-radius:8px; padding:1rem; margin-top:0.5rem; line-height:1.7;">${miniMd(g.guia_markdown || g.diagnostico || "")}</div></div>`).join("") + `</div>` : "";
+
+            // --- Cuaderno de errores ---
+            const errores = vistas.map(v => ({ ...(bancoMap[v.pregunta_id] || {}), vista_id: v.id, fecha: v.fecha }))
+                .filter(e => e.texto);
+            window._ultimosErrores = errores;
+            renderErrores(errores);
+        }
 
         if (window._selectedUni === "UNI") {
             document.getElementById("tab-btn-simulacro").style.display = "inline-block";
