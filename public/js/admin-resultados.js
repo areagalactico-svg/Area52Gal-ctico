@@ -213,6 +213,62 @@ async function cargarBancoStats() {
   }
 }
 
+/* ---------- RUTA DE INGRESO (admin) ---------- */
+const INGRESO_UNIS = ["UNI", "San Marcos", "Católica", "La Molina", "San Martín", "Pacifico"];
+
+async function cargarIngresoAdmin() {
+  const box = document.getElementById("ingreso-admin-list");
+  if (!box) return;
+  let datos = [];
+  try {
+    const { data } = await supabase.from("datos_ingreso").select("*");
+    datos = data || [];
+  } catch (e) {
+    box.innerHTML = `<div class="card"><p style="color:#888;">Ejecuta <code>supabase-ruta-ingreso.sql</code> para activar esta sección.</p></div>`;
+    return;
+  }
+  const porUni = Object.fromEntries(datos.map((d) => [d.universidad, d]));
+  box.innerHTML = "";
+  INGRESO_UNIS.forEach((u) => {
+    const d = porUni[u] || {};
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.marginBottom = "0.7rem";
+    div.innerHTML = `<h4 style="margin-bottom:0.6rem;">${escapeHtml(u)}</h4>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:0.6rem;">
+        <label style="font-size:0.8rem;">Fecha examen<input type="date" id="ing-${u}-fecha" value="${d.fecha_examen || ""}" style="width:100%; padding:0.45rem; border:2px solid #e0e0e0; border-radius:8px;"></label>
+        <label style="font-size:0.8rem;">Vacantes<input type="text" id="ing-${u}-vac" value="${escapeHtml(d.vacantes || "")}" placeholder="Ej: 400" style="width:100%; padding:0.45rem; border:2px solid #e0e0e0; border-radius:8px;"></label>
+        <label style="font-size:0.8rem;">Puntaje referencial /20<input type="number" id="ing-${u}-punt" value="${d.puntaje_referencial ?? ""}" step="0.1" min="0" max="20" style="width:100%; padding:0.45rem; border:2px solid #e0e0e0; border-radius:8px;"></label>
+        <label style="font-size:0.8rem;">Límite pago<input type="date" id="ing-${u}-lim" value="${d.fecha_limite_pago || ""}" style="width:100%; padding:0.45rem; border:2px solid #e0e0e0; border-radius:8px;"></label>
+        <label style="font-size:0.8rem;">Link oficial<input type="url" id="ing-${u}-link" value="${escapeHtml(d.link_info || "")}" placeholder="https://..." style="width:100%; padding:0.45rem; border:2px solid #e0e0e0; border-radius:8px;"></label>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:0.6rem;">Guardar ${escapeHtml(u)}</button>
+      <span class="ing-msg" style="margin-left:0.6rem; font-size:0.82rem;"></span>`;
+    div.querySelector("button").onclick = async () => {
+      const msg = div.querySelector(".ing-msg");
+      const fila = {
+        universidad: u,
+        fecha_examen: document.getElementById(`ing-${u}-fecha`).value || null,
+        vacantes: document.getElementById(`ing-${u}-vac`).value.trim(),
+        puntaje_referencial: document.getElementById(`ing-${u}-punt`).value === "" ? null : parseFloat(document.getElementById(`ing-${u}-punt`).value),
+        fecha_limite_pago: document.getElementById(`ing-${u}-lim`).value || null,
+        link_info: document.getElementById(`ing-${u}-link`).value.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      msg.textContent = "Guardando...";
+      try {
+        const { error } = await supabase.from("datos_ingreso").upsert(fila, { onConflict: "universidad" });
+        msg.textContent = error ? "Error: " + error.message : "✅ Guardado";
+        msg.style.color = error ? "#e74c3c" : "#00a37a";
+      } catch (e) {
+        msg.textContent = "Error de conexión";
+        msg.style.color = "#e74c3c";
+      }
+    };
+    box.appendChild(div);
+  });
+}
+
 /* ---------- INIT ---------- */
 document.getElementById("res-simulacro")?.addEventListener("change", cargarResultados);
 document.getElementById("res-buscar")?.addEventListener("input", () => clearTimeout(window.__resT) || (window.__resT = setTimeout(cargarResultados, 300)));
@@ -225,4 +281,5 @@ document.querySelectorAll('.tab-btn[data-tab="resultados"]').forEach((b) => b.ad
   cargarResultados(); cargarGuias();
 }));
 document.querySelectorAll('.tab-btn[data-tab="agentes"]').forEach((b) => b.addEventListener("click", () => { cargarGuias(); cargarBancoStats(); }));
+document.querySelectorAll('.tab-btn[data-tab="ingreso"]').forEach((b) => b.addEventListener("click", cargarIngresoAdmin));
 cargarSimulacrosParaFiltro();

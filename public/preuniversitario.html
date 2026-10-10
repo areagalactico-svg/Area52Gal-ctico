@@ -151,8 +151,9 @@
                 <button class="tab-btn active" data-tab="temarios" onclick="showTab('temarios')">📚 Temarios</button>
                 <button class="tab-btn" data-tab="examenes" onclick="showTab('examenes')">📝 Exámenes</button>
                 <button class="tab-btn" data-tab="simulacro" id="tab-btn-simulacro" onclick="showTab('simulacro')">🎯 Simulacro IEN</button>
-                <button class="tab-btn" data-tab="avance" onclick="showTab('avance')">📊 Mi Avance</button>
-                <button class="tab-btn" data-tab="tutor" onclick="showTab('tutor')">🤖 Tutor</button>
+                <button class="tab-btn" data-tab="avance" onclick="showTab('avance')">Mi ruta</button>
+                <button class="tab-btn" data-tab="tutor" onclick="showTab('tutor')">Tutor</button>
+                <button class="tab-btn" data-tab="ingreso" onclick="showTab('ingreso')">Ingreso</button>
                 <button class="tab-btn" data-tab="materiales" onclick="showTab('materiales')">📎 Materiales</button>
             </div>
 
@@ -172,8 +173,10 @@
             </div>
 
             <div id="tab-avance" class="tab-content">
+                <div id="avance-saludo" style="margin-bottom:1.2rem;"></div>
                 <div id="avance-countdown" style="margin-bottom:1.2rem;"></div>
                 <div id="avance-resumen"></div>
+                <div id="avance-plan" style="margin-top:1.2rem;"></div>
                 <div id="avance-evolucion" style="margin-top:1.2rem;"></div>
                 <div id="avance-areas" style="margin-top:1.2rem;"></div>
                 <div id="avance-guias" style="margin-top:1.2rem;"></div>
@@ -186,7 +189,8 @@
             </div>
 
             <div id="tab-tutor" class="tab-content">
-                <div class="content-card" style="border-left:4px solid #00c896;">
+              <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-start;">
+                <div class="content-card" style="border-left:4px solid #00c896; flex:2; min-width:280px;">
                     <h3>🤖 Tu tutor personal <span id="tutor-uni" style="color:#00a37a;"></span></h3>
                     <p style="color:#666; font-size:0.9rem;">Conoce tu nivel, tus errores y el temario de tu universidad. Elige cómo quieres aprender hoy:</p>
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.8rem 0;" id="tutor-modos">
@@ -205,6 +209,30 @@
                     <div style="display:flex; gap:0.5rem;">
                         <input id="tutor-input" placeholder="Escribe tu duda o tema..." style="flex:1; padding:0.7rem 1rem; border:2px solid #e0e0e0; border-radius:25px; font-size:0.95rem; outline:none;" onkeydown="if(event.key==='Enter')tutorEnviar()">
                         <button class="btn btn-primary" id="tutor-send" onclick="tutorEnviar()" style="border-radius:50%; width:46px; height:46px; padding:0; border-color:#00c896; background:#00c896;">➤</button>
+                    </div>
+                </div>
+                <div id="tutor-panel" style="flex:1; min-width:240px;"></div>
+              </div>
+            </div>
+
+            <div id="tab-ingreso" class="tab-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+                    <div>
+                        <h2 style="margin:0;">Ruta de ingreso</h2>
+                        <p style="color:#666; font-size:0.92rem;">Todo lo que necesitas para postular, en un solo lugar</p>
+                    </div>
+                    <a href="https://wa.me/51933884059?text=Hola%20Área%2052,%20quiero%20asesoría%20para%20mi%20inscripción" class="btn" target="_blank">Hablar por WhatsApp</a>
+                </div>
+                <div id="ingreso-unis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.2rem;"></div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+                    <div class="content-card">
+                        <h3>Checklist de inscripción</h3>
+                        <div id="ingreso-checklist"></div>
+                    </div>
+                    <div class="content-card">
+                        <h3>Calculadora de probabilidad</h3>
+                        <p style="color:#666; font-size:0.88rem;">Compara tu nivel actual con el puntaje de ingreso histórico de tu carrera.</p>
+                        <div id="ingreso-calc"></div>
                     </div>
                 </div>
             </div>
@@ -333,6 +361,7 @@
             if (tab === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
             if (tab === "avance" && window._loadMiAvance) window._loadMiAvance();
             if (tab === "tutor" && window._initTutor) window._initTutor();
+            if (tab === "ingreso" && window._loadIngreso) window._loadIngreso();
         };
         window._selectedUni = "UNI";
 
@@ -1076,13 +1105,15 @@
             let solucionario = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Solucionario y Correccion</h3>';
             details.forEach((d, i) => {
                 const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : d.isBlank ? '<span style="color:#f39c12;font-weight:bold;">En blanco</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
+                const tag = d.isBlank ? "Sin tiempo" : (d.area === "PE1" ? "Concepto" : "Cálculo");
+                const due = !d.isCorrect ? '<span style="background:#fde8e8; color:#c0392b; padding:0.1rem 0.5rem; border-radius:10px; font-size:0.72rem; margin-left:0.4rem;">Repasar en 3 días</span>' : "";
                 const selectedText = d.selected !== undefined ? d.opciones[d.selected] : '<em>No respondida</em>';
                 const correctText = d.opciones[d.correct];
                 const areaColor = d.area === 'PE1' ? '#3498db' : d.area === 'PE2' ? '#e74c3c' : d.area === 'PE3' ? '#2ecc71' : '#ff6b6b';
                 solucionario += `
                     <div style="background:${d.isCorrect ? '#f0faf7' : d.isBlank ? '#fffbf0' : '#fff5f5'};border:1px solid ${d.isCorrect ? '#00c89633' : d.isBlank ? '#f39c1233' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                            <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''}</span>
+                            <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''} ${!d.isCorrect ? `<span style="background:#fde8e8;color:#c0392b;padding:0.1rem 0.5rem;border-radius:10px;font-size:0.72rem;">${tag}</span>${due}` : ''}</span>
                             <span>${icon} <span style="font-weight:bold;color:${d.puntos >= 0 ? '#00c896' : '#e74c3c'};">${d.puntos >= 0 ? '+' : ''}${d.puntos.toFixed(2)} pts</span></span>
                         </div>
                         <p style="margin-bottom:0.5rem;color:#333;">${d.texto}</p>
@@ -1098,6 +1129,9 @@
         function buildResultsPageHTML(state, lb, myEmail) {
             const { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed } = state;
             const elapsedMin = Math.floor(elapsed / 60);
+            const porPreg = total ? elapsed / total : 0;
+            const tppTxt = `${Math.floor(porPreg / 60)} min ${String(Math.round(porPreg % 60)).padStart(2, "0")} s`;
+            const topTxt = (lb && lb.rank > 0) ? `Top ${Math.max(1, Math.round(lb.rank / lb.rows.length * 100))}%` : "";
             const resultadoMsg = pct >= 80 ? "Excelente! Estas bien preparado." : pct >= 60 ? "Buen resultado. Sigue practicando." : pct >= 40 ? "Resultado regular. Refuerza estas areas." : "Necesitas estudiar mas. No te rindas!";
             const breakdown = buildBreakdownHTML(areaResults);
             const leaderboardHtml = buildLeaderboardHTML(lb, myEmail);
@@ -1105,10 +1139,13 @@
 
             return `
                 <div class="simulacro-result">
+                    <div style="display:flex; justify-content:flex-end; margin-bottom:0.5rem;">
+                        <button class="btn btn-primary" onclick="tutorEstudiar('', 'errores')" style="background:#ff6b6b; border-color:#ff6b6b;">Repasar mis errores</button>
+                    </div>
                     <p style="color:#888;font-size:1rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.3rem;">Tu nota IEN</p>
                     <h2 style="color:#ff6b6b;font-size:3.5rem;margin:0;">${nota.toFixed(1)} <span style="font-size:1.5rem;color:#888;">/ 20</span></h2>
                     <p style="font-size:1.1rem;color:#333;margin-top:0.8rem;">${puntajeTotal.toFixed(2)} pts | ${pct}% de calificacion | ${correct}/${total} correctas</p>
-                    <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos</p>
+                    <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos · ${tppTxt} por pregunta${topTxt ? ` · <strong style="color:#00a37a;">${topTxt}</strong> entre estudiantes de Área 52` : ""}</p>
                     ${lb && lb.rank > 0 ? `<p style="font-size:1.2rem;font-weight:bold;color:#1a1a2e;margin:1rem 0;">🏆 Tu puesto: N° ${lb.rank} de ${lb.rows.length}</p>` : ''}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>
                     ${breakdown}
@@ -1417,13 +1454,15 @@
             const email = await resolveStudentEmail();
             const uni = window._selectedUni || "UNI";
             const nombre = window._studentNombre || "Estudiante";
+            const box0 = document.getElementById("avance-saludo");
             const box1 = document.getElementById("avance-countdown");
             const box2 = document.getElementById("avance-resumen");
+            const boxPlan = document.getElementById("avance-plan");
             const box3 = document.getElementById("avance-evolucion");
             const box4 = document.getElementById("avance-areas");
             const box5 = document.getElementById("avance-guias");
             if (!email || email === "anonimo") {
-                [box1, box2, box3, box4, box5].forEach(b => { if (b) b.innerHTML = ""; });
+                [box0, box1, box2, boxPlan, box3, box4, box5].forEach(b => { if (b) b.innerHTML = ""; });
                 document.getElementById("avance-errores").innerHTML = '<div class="content-card"><p style="text-align:center; color:#888;">Inicia sesión para ver tu avance.</p></div>';
                 return;
             }
@@ -1447,17 +1486,19 @@
             } catch {}
             let vistas = [];
             try {
-                const r = await supabase.from("pregunta_vistas").select("id,pregunta_id,simulacro_id,fue_correcta,fecha").eq("estudiante_email", email).eq("fue_correcta", false).order("fecha", { ascending: false }).limit(200);
+                const r = await supabase.from("pregunta_vistas").select("id,pregunta_id,simulacro_id,fue_correcta,fecha").eq("estudiante_email", email).order("fecha", { ascending: false }).limit(300);
                 vistas = r.data || [];
             } catch {}
+            const vistasErr = vistas.filter(v => v.fue_correcta === false);
             let bancoMap = {};
             if (vistas.length) {
                 try {
-                    const ids = [...new Set(vistas.map(v => v.pregunta_id))].slice(0, 200);
+                    const ids = [...new Set(vistas.map(v => v.pregunta_id))].slice(0, 300);
                     const r = await supabase.from("banco_preguntas").select("id,texto,opciones,respuesta_correcta,explicacion,area,subtema").in("id", ids);
                     (r.data || []).forEach(b => { bancoMap[b.id] = b; });
                 } catch {}
             }
+            window._rutaStats = { subs, vistas, bancoMap, proximo, uni, nombre, email };
 
             // --- Cuenta regresiva ---
             if (proximo && proximo.fecha_inicio) {
@@ -1480,24 +1521,92 @@
                 box1.innerHTML = `<div class="content-card" style="text-align:center;"><p style="color:#888;">Sin examen programado para ${escAv(uni)} por ahora. <a href="https://wa.me/51933884059" style="color:#ff6b6b; font-weight:bold;">Pregúntanos el cronograma por WhatsApp</a></p></div>`;
             }
 
+            const diaStr = (d) => new Date(d).toLocaleDateString("en-CA");
+            const hoy = new Date();
+            const diasAct = new Set([
+                ...subs.map(s => s.fecha_fin || s.fecha_inicio).filter(Boolean).map(diaStr),
+                ...vistas.map(v => v.fecha).filter(Boolean).map(diaStr)
+            ]);
+            let racha = 0;
+            {
+                const base = diasAct.has(diaStr(hoy)) ? new Date(hoy) : new Date(hoy.getTime() - 86400000);
+                let cur = new Date(base);
+                while (diasAct.has(diaStr(cur))) { racha++; cur = new Date(cur.getTime() - 86400000); }
+            }
+            const hace7 = Date.now() - 7 * 86400000;
+            const sesionesSemana = [...diasAct].filter(d => new Date(d).getTime() >= hace7).length;
+
+            // Agregado por área (para plan + barras)
+            const agg = {};
+            subs.forEach(s => {
+                const ar = s.area_results || {};
+                for (const [a, d] of Object.entries(ar)) {
+                    agg[a] = agg[a] || { c: 0, t: 0 };
+                    agg[a].c += d.correct || 0;
+                    agg[a].t += (d.correct || 0) + (d.wrong || 0) + (d.blank || 0);
+                }
+            });
+            const debiles = Object.entries(agg)
+                .map(([a, d]) => ({ area: a, pct: d.t ? Math.round(d.c / d.t * 100) : 0 }))
+                .sort((x, y) => x.pct - y.pct);
+            const peor = debiles[0] || null;
+
+            // Saludo + continuar
+            let destinoTxt = "Rinde tu primer simulacro";
+            let destinoFn = "showTab('simulacro')";
+            if (proximo && proximo.fecha_inicio && new Date(proximo.fecha_inicio).getTime() > Date.now()) {
+                destinoTxt = "Ir a mi próximo examen";
+                destinoFn = "showTab('simulacro')";
+            } else if (peor) {
+                destinoTxt = `Seguir con ${peor.area} en el tutor`;
+                destinoFn = `tutorEstudiar('${peor.area.replace(/'/g, "")}', 'explicar')`;
+            }
+            box0.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem;">
+                <div><h2 style="margin:0;">Hola, ${escAv(nombre)}. Tu ruta hacia ${escAv(uni)}</h2>
+                <p style="color:#666; margin:0.2rem 0 0;">Plan adaptado a tu nivel y a tus errores recientes</p></div>
+                <button class="btn btn-primary" onclick="${destinoFn}">${destinoTxt}</button></div>`;
+
             if (!subs.length) {
-                box2.innerHTML = `<div class="content-card" style="text-align:center;"><h3>Hola, ${escAv(nombre)} 👋</h3><p style="color:#666;">Aún no tienes simulacros registrados. Rinde tu primer simulacro y aquí verás tu evolución, tu nivel por área y tu cuaderno de errores.</p></div>`;
-                box3.innerHTML = ""; box4.innerHTML = "";
+                box2.innerHTML = `<div class="content-card" style="text-align:center;"><p style="color:#666;">Aún no tienes simulacros registrados. Rinde el primero y aquí verás tu evolución, tu nivel por área y tu plan diario.</p></div>`;
+                boxPlan.innerHTML = ""; box3.innerHTML = ""; box4.innerHTML = "";
             } else {
                 const notas = subs.map(s => Number(s.nota || 0));
                 const mejor = Math.max(...notas);
                 const prom = notas.reduce((a, b) => a + b, 0) / notas.length;
-                let rankTxt = "";
-                try {
-                    const ultimo = subs[0];
-                    if (ultimo.simulacro_id) {
-                        const lb = await fetchSimulacroLeaderboard(ultimo.simulacro_id, email);
-                        if (lb.rank > 0) rankTxt = ` · 🏆 Puesto N° ${lb.rank} de ${lb.rows.length}`;
-                    }
-                } catch {}
-                box2.innerHTML = `<div class="content-card"><h3>Hola, ${escAv(nombre)} 👋</h3>
-                    <p style="font-size:1.05rem;">${subs.length} simulacro(s) · Mejor nota: <strong style="color:#00a37a;">${mejor.toFixed(1)}/20</strong> · Promedio: <strong>${prom.toFixed(1)}</strong>${rankTxt}</p>
-                    <p style="color:#888; font-size:0.88rem;">${prom >= 14 ? "🔥 En zona de ingreso: afina velocidad y evita errores tontos." : prom >= 11 ? "💪 Base lista: cierra tus áreas rojas para entrar en zona segura." : "🌱 En construcción: prioriza tus 3 focos y repasa tu cuaderno."}</p></div>`;
+                const hace30 = Date.now() - 30 * 86400000, hace60 = Date.now() - 60 * 86400000;
+                const rec = subs.filter(s => new Date(s.fecha_fin || s.fecha_inicio || 0).getTime() >= hace30).map(s => Number(s.nota || 0));
+                const prev = subs.filter(s => { const t = new Date(s.fecha_fin || s.fecha_inicio || 0).getTime(); return t < hace30 && t >= hace60; }).map(s => Number(s.nota || 0));
+                const delta = (rec.length && prev.length) ? (rec.reduce((a, b) => a + b, 0) / rec.length - prev.reduce((a, b) => a + b, 0) / prev.length) : 0;
+                const deltaTxt = (rec.length && prev.length) ? `<br><span style="font-size:0.85rem; color:${delta >= 0 ? "#00a37a" : "#ff6b6b"};">${delta >= 0 ? "+" : ""}${delta.toFixed(1)} respecto al mes pasado</span>` : "";
+                let diasFaltan = "[N]";
+                if (proximo && proximo.fecha_inicio) {
+                    diasFaltan = Math.max(0, Math.ceil((new Date(proximo.fecha_inicio).getTime() - Date.now()) / 86400000));
+                }
+                box2.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem;">
+                    <div class="content-card" style="background:#1a1a2e; color:white; border:none;">
+                        <p style="opacity:0.8; font-size:0.85rem;">Próximo examen</p>
+                        <p style="font-size:2rem; font-weight:bold; margin:0.2rem 0;">${diasFaltan} días</p>
+                        <p style="opacity:0.8; font-size:0.85rem;">${proximo ? escAv(proximo.titulo || "Simulacro") : "Sin fecha programada"}</p></div>
+                    <div class="content-card"><p style="color:#888; font-size:0.85rem;">Nivel estimado</p>
+                        <p style="font-size:2rem; font-weight:bold; margin:0.2rem 0;">${prom.toFixed(1)} / 20</p>
+                        <p style="color:#888; font-size:0.85rem;">Mejor: ${mejor.toFixed(1)}${deltaTxt}</p></div>
+                    <div class="content-card"><p style="color:#888; font-size:0.85rem;">Racha de estudio</p>
+                        <p style="font-size:2rem; font-weight:bold; margin:0.2rem 0;">${racha} día${racha === 1 ? "" : "s"}</p>
+                        <p style="color:#888; font-size:0.85rem;">Meta semanal: ${Math.min(sesionesSemana, 7)} de 7 sesiones</p></div></div>`;
+
+                // Plan de hoy · 90 min
+                const repasadas = getRepasadas();
+                const pendientes = vistasErr.filter(v => !repasadas.has(v.id) && (Date.now() - new Date(v.fecha).getTime()) >= 3 * 86400000);
+                const planItems = [
+                    { t: `Repaso espaciado: ${pendientes.length} pregunta${pendientes.length === 1 ? "" : "s"} fallada${pendientes.length === 1 ? "" : "s"}`, min: "20 min", fn: "document.getElementById('avance-errores').scrollIntoView({behavior:'smooth'})", btn: "Repasar" },
+                    { t: peor ? `${peor.area}: sesión con el tutor` : "Sesión con el tutor", min: "35 min", fn: peor ? `tutorEstudiar('${peor.area.replace(/'/g, "")}', 'explicar')` : "showTab('tutor')", btn: "Estudiar" },
+                    { t: `Práctica cronometrada${peor ? " de " + peor.area : ""}, 15 preguntas`, min: "25 min", fn: "showTab('simulacro')", btn: "Practicar" },
+                    { t: "Resumen del día y meta de mañana", min: "10 min", fn: "showTab('ingreso')", btn: "Ver metas" },
+                ];
+                boxPlan.innerHTML = `<div class="content-card"><h3>Plan de hoy · 90 min</h3>` +
+                    planItems.map(p => `<div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; padding:0.55rem 0; border-bottom:1px solid #f0f0f0;">
+                        <span>${escAv(p.t)} <button class="filter-btn" style="margin-left:0.5rem; padding:0.25rem 0.8rem; font-size:0.78rem;" onclick="${p.fn}">${p.btn}</button></span>
+                        <span style="color:#888; font-size:0.85rem; white-space:nowrap;">${p.min}</span></div>`).join("") + `</div>`;
 
                 const ultimos = [...subs].reverse().slice(-10);
                 box3.innerHTML = `<div class="content-card"><h3>📈 Tu evolución (nota /20)</h3>` +
@@ -1510,25 +1619,13 @@
                         </div>`;
                     }).join("") + `</div>`;
 
-                const agg = {};
-                subs.forEach(s => {
-                    const ar = s.area_results || {};
-                    for (const [a, d] of Object.entries(ar)) {
-                        agg[a] = agg[a] || { c: 0, t: 0, p: 0 };
-                        agg[a].c += d.correct || 0;
-                        agg[a].t += (d.correct || 0) + (d.wrong || 0) + (d.blank || 0);
-                        agg[a].p += Number(d.puntos || 0);
-                    }
-                });
-                const entries = Object.entries(agg);
-                box4.innerHTML = entries.length ? `<div class="content-card"><h3>🚦 Tu nivel por área</h3>` +
-                    entries.map(([a, d]) => {
-                        const pct = d.t ? Math.round(d.c / d.t * 100) : 0;
-                        const dot = pct >= 70 ? "🟢" : pct >= 45 ? "🟡" : "🔴";
-                        const msg = pct >= 70 ? "dominada" : pct >= 45 ? "en proceso" : "foco urgente";
-                        return `<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid #f0f0f0;">
-                            <span>${dot} <strong>${escAv(a)}</strong> <span style="color:#888;">(${msg})</span></span>
-                            <span style="color:#555;">${d.c}/${d.t} · ${pct}%</span></div>`;
+                box4.innerHTML = debiles.length ? `<div class="content-card"><h3>Nivel por área</h3>` +
+                    debiles.map(d => {
+                        const color = d.pct >= 70 ? "#00c896" : d.pct >= 45 ? "#f39c12" : "#e74c3c";
+                        return `<div style="display:flex; align-items:center; gap:0.8rem; margin:0.5rem 0;">
+                            <span style="width:130px;">${escAv(d.area)}</span>
+                            <div style="flex:1; background:#edf0f5; border-radius:6px; height:12px;"><div style="width:${d.pct}%; background:${color}; height:100%; border-radius:6px;"></div></div>
+                            <span style="width:44px; text-align:right; color:#555;">${d.pct}%</span></div>`;
                     }).join("") + `</div>` : "";
             }
 
@@ -1540,7 +1637,7 @@
                     <div id="guia-av-${i}" style="display:none; background:#f8f9fa; border-radius:8px; padding:1rem; margin-top:0.5rem; line-height:1.7;">${miniMd(g.guia_markdown || g.diagnostico || "")}</div></div>`).join("") + `</div>` : "";
 
             // --- Cuaderno de errores ---
-            const errores = vistas.map(v => ({ ...(bancoMap[v.pregunta_id] || {}), vista_id: v.id, fecha: v.fecha }))
+            const errores = vistasErr.map(v => ({ ...(bancoMap[v.pregunta_id] || {}), vista_id: v.id, fecha: v.fecha }))
                 .filter(e => e.texto);
             window._ultimosErrores = errores;
             renderErrores(errores);
@@ -1585,6 +1682,7 @@
         window._initTutor = function() {
             document.getElementById("tutor-uni").textContent = "· " + tutorUni();
             document.getElementById("tutor-login-hint").style.display = window._studentUser ? "none" : "block";
+            actualizarPanelTutor();
             if (window._tutorSaludado) return;
             window._tutorSaludado = true;
             tutorLoadHist();
@@ -1598,14 +1696,14 @@
             window._tutorTema = String(tema || "").slice(0, 120);
             if (modo) window.tutorSetModo(modo, document.querySelector(`#tutor-modos [data-modo="${modo}"]`));
             document.getElementById("tutor-tema").textContent = window._tutorTema;
-            document.getElementById("tutor-tema-line").style.display = "block";
+            document.getElementById("tutor-tema-line").style.display = window._tutorTema ? "block" : "none";
             window.showTab("tutor");
             window._initTutor();
             const prompts = {
                 explicar: `Explícame el tema: ${window._tutorTema}`,
                 practicar: `Quiero practicar: ${window._tutorTema}. Dame el primer ejercicio.`,
                 socratico: `Ayúdame a descubrir por mí mismo: ${window._tutorTema}`,
-                errores: `Fallo mucho en: ${window._tutorTema}. Re-enséñamelo con ejemplos nuevos.`
+                errores: window._tutorTema ? `Fallo mucho en: ${window._tutorTema}. Re-enséñamelo con ejemplos nuevos.` : `Quiero repasar mis errores del último simulacro. Empieza por el más frecuente.`
             };
             tutorEnviar(prompts[window._tutorModo] || prompts.explicar);
         };
@@ -1646,6 +1744,137 @@
                 tutorPinta("⚠️ No pude responder ahora. Revisa tu conexión e intenta de nuevo.", "bot");
             } finally { btn.disabled = false; }
         };
+
+        async function actualizarPanelTutor() {
+            const panel = document.getElementById("tutor-panel");
+            if (!panel) return;
+            const email = await resolveStudentEmail();
+            if (!email || email === "anonimo") {
+                panel.innerHTML = `<div class="content-card"><h3>Tu nivel en el tema</h3><p style="color:#888; font-size:0.88rem;">Inicia sesión y rinde un simulacro: aquí verás tu dominio por subtema, tu error más frecuente y qué estudiar después.</p></div>`;
+                return;
+            }
+            let st = window._rutaStats;
+            if (!st || st.email !== email) {
+                try {
+                    const rv = await supabase.from("pregunta_vistas").select("pregunta_id,fue_correcta").eq("estudiante_email", email).limit(300);
+                    const vids = [...new Set((rv.data || []).map(v => v.pregunta_id))].slice(0, 300);
+                    let bmap = {};
+                    if (vids.length) {
+                        const rb = await supabase.from("banco_preguntas").select("id,subtema,area").in("id", vids);
+                        (rb.data || []).forEach(b => { bmap[b.id] = b; });
+                    }
+                    st = { vistas: rv.data || [], bancoMap: bmap };
+                } catch { st = { vistas: [], bancoMap: {} }; }
+            }
+            const porSub = {};
+            (st.vistas || []).forEach(v => {
+                const b = (st.bancoMap || {})[v.pregunta_id];
+                const s = (b && b.subtema) || (b && b.area) || "General";
+                porSub[s] = porSub[s] || { c: 0, t: 0 };
+                porSub[s].t++;
+                if (v.fue_correcta === true) porSub[s].c++;
+            });
+            const subs = Object.entries(porSub).map(([s, d]) => ({ s, pct: Math.round(d.c / d.t * 100), t: d.t }))
+                .sort((a, b) => a.pct - b.pct);
+            const norm = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(w => w.length > 3);
+            const keys = norm(window._tutorTema);
+            const rel = keys.length ? subs.filter(x => keys.some(k => x.s.toLowerCase().includes(k))) : [];
+            const mostrar = (rel.length ? rel : subs).slice(0, 3);
+            const peor = subs[0] || null;
+            const siguiente = subs.find(x => !keys.some(k => x.s.toLowerCase().includes(k))) || subs[1] || null;
+            const bar = (x) => {
+                const color = x.pct >= 70 ? "#00c896" : x.pct >= 45 ? "#f39c12" : "#e74c3c";
+                return `<div style="margin:0.4rem 0;"><div style="display:flex; justify-content:space-between; font-size:0.85rem;"><span>${escAv(x.s)}</span><span style="color:#555;">${x.pct}%</span></div>
+                    <div style="background:#edf0f5; border-radius:6px; height:10px;"><div style="width:${x.pct}%; background:${color}; height:100%; border-radius:6px;"></div></div></div>`;
+            };
+            panel.innerHTML = `<div class="content-card"><h3>Tu nivel en el tema</h3>
+                ${mostrar.length ? mostrar.map(bar).join("") : '<p style="color:#888; font-size:0.88rem;">Sin datos aún: rinde un simulacro y vuelve.</p>'}
+                ${peor ? `<p style="font-size:0.85rem; color:#555; margin-top:0.6rem;">Error frecuente detectado<br><span class="badge-tag" style="background:#fde8e8; color:#c0392b;">${escAv(peor.s)}</span></p>` : ""}
+                ${siguiente ? `<p style="font-size:0.85rem; color:#555;">Siguiente en tu ruta<br><span class="badge-tag green" style="cursor:pointer;" onclick="tutorEstudiar('${siguiente.s.replace(/'/g, "")}', 'explicar')">${escAv(siguiente.s)}</span></p>` : ""}</div>`;
+        }
+
+        // === INGRESO: datos por universidad, checklist y calculadora ===
+        const UNIS_INGRESO = ["UNI", "San Marcos", "Católica", "La Molina", "San Martín", "Pacifico"];
+        window._loadIngreso = function() { cargarIngreso(); };
+        window.toggleCheck = function(key) {
+            try {
+                const c = JSON.parse(localStorage.getItem("area52_checklist") || "{}");
+                c[key] = !c[key];
+                localStorage.setItem("area52_checklist", JSON.stringify(c));
+            } catch {}
+            cargarIngreso();
+        };
+
+        async function cargarIngreso() {
+            const boxU = document.getElementById("ingreso-unis");
+            const boxC = document.getElementById("ingreso-checklist");
+            const boxK = document.getElementById("ingreso-calc");
+            const uni = window._selectedUni || "UNI";
+            let datos = [];
+            try {
+                const r = await supabase.from("datos_ingreso").select("*");
+                datos = r.data || [];
+            } catch {}
+            const porUni = Object.fromEntries(datos.map(d => [d.universidad, d]));
+            const fmtF = (f) => f ? new Date(f + "T12:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" }) : '<span style="color:#999;">[por cargar]</span>';
+            boxU.innerHTML = UNIS_INGRESO.map(u => {
+                const d = porUni[u] || {};
+                return `<div class="content-card" style="${u === uni ? "border:2px solid #ff6b6b;" : ""}">
+                    <h3>${escAv(u)}${u === uni ? ' <span class="badge-tag">Tu objetivo</span>' : ""}</h3>
+                    <div style="display:flex; justify-content:space-between; padding:0.35rem 0; border-bottom:1px solid #f0f0f0;"><span>Fecha de examen</span><span style="color:#555;">${fmtF(d.fecha_examen)}</span></div>
+                    <div style="display:flex; justify-content:space-between; padding:0.35rem 0; border-bottom:1px solid #f0f0f0;"><span>Vacantes de tu carrera</span><span style="color:#555;">${d.vacantes ? escAv(d.vacantes) : '<span style="color:#999;">[por cargar]</span>'}</span></div>
+                    <div style="display:flex; justify-content:space-between; padding:0.35rem 0;"><span>Puntaje referencial</span><span style="color:#555;">${d.puntaje_referencial != null ? Number(d.puntaje_referencial).toFixed(1) + " / 20" : '<span style="color:#999;">[por cargar]</span>'}</span></div>
+                    ${d.link_info ? `<a href="${escAv(d.link_info)}" target="_blank" style="color:#00a37a; font-size:0.85rem; font-weight:bold;">Ver información oficial →</a>` : ""}</div>`;
+            }).join("");
+
+            let chk = {};
+            try { chk = JSON.parse(localStorage.getItem("area52_checklist") || "{}"); } catch {}
+            const dUni = porUni[uni] || {};
+            const items = [
+                { k: "carrera", t: "Elegir carrera y universidad", f: "" },
+                { k: "docs", t: "Documentos de identidad", f: "" },
+                { k: "pago", t: "Pago de derechos", f: dUni.fecha_limite_pago ? fmtF(dUni.fecha_limite_pago) : "[fecha límite]" },
+                { k: "insc", t: "Inscripción en línea", f: dUni.fecha_examen ? fmtF(dUni.fecha_examen) : "[fecha límite]" },
+            ];
+            boxC.innerHTML = items.map(it => `<div style="display:flex; align-items:center; gap:0.7rem; padding:0.5rem 0; border-bottom:1px solid #f0f0f0;">
+                <span class="badge-tag ${chk[it.k] ? "green" : ""}" style="${chk[it.k] ? "" : "background:#fde8e8; color:#c0392b;"} cursor:pointer;" onclick="toggleCheck('${it.k}')">${chk[it.k] ? "Listo" : "Pendiente"}</span>
+                <span style="flex:1;">${escAv(it.t)}</span>
+                <span style="color:#888; font-size:0.82rem;">${it.f}</span></div>`).join("");
+
+            // Calculadora
+            const email = await resolveStudentEmail();
+            if (!email || email === "anonimo") {
+                boxK.innerHTML = '<p style="color:#888;">Inicia sesión y rinde un simulacro para calcular tu probabilidad.</p>';
+                return;
+            }
+            let subs = [];
+            try {
+                const r = await supabase.from("simulacro_submissions").select("nota,fecha_fin,fecha_inicio").eq("estudiante_email", email).order("fecha_fin", { ascending: false }).limit(12);
+                subs = r.data || [];
+            } catch {}
+            const ref = dUni.puntaje_referencial != null ? Number(dUni.puntaje_referencial) : null;
+            if (!subs.length) {
+                boxK.innerHTML = '<p style="color:#888;">Sin simulacros aún. Tu probabilidad aparecerá aquí.</p>';
+                return;
+            }
+            const prom = subs.reduce((a, s) => a + Number(s.nota || 0), 0) / subs.length;
+            if (ref == null) {
+                boxK.innerHTML = `<p>Tu avance: <strong>${prom.toFixed(1)} / 20</strong></p><p style="color:#888;">El puntaje referencial de ${escAv(uni)} aún está [por cargar].</p>`;
+                return;
+            }
+            const avance = Math.min(100, Math.round(prom / ref * 100));
+            const faltan = Math.max(0, ref - prom);
+            const ord = [...subs].reverse();
+            let ritmo = 0;
+            if (ord.length >= 2) {
+                const dias = Math.max(1, (new Date(ord[ord.length - 1].fecha_fin || Date.now()).getTime() - new Date(ord[0].fecha_fin || Date.now()).getTime()) / 86400000);
+                ritmo = (Number(ord[ord.length - 1].nota || 0) - Number(ord[0].nota || 0)) / (dias / 7);
+            }
+            const sems = (faltan > 0 && ritmo > 0.05) ? `Con tu ritmo actual llegas en <strong>${Math.ceil(faltan / ritmo)} semana(s)</strong>.` : (faltan <= 0 ? "🎉 Ya estás en zona de ingreso. Mantén el ritmo." : "Rinde más simulacros para estimar tu ritmo.");
+            boxK.innerHTML = `<p>Tu avance <span style="float:right; font-weight:bold;">${avance}%</span></p>
+                <div style="background:#edf0f5; border-radius:6px; height:12px; margin:0.4rem 0 0.8rem;"><div style="width:${avance}%; background:#00a37a; height:100%; border-radius:6px;"></div></div>
+                <p style="color:#555;">Te faltan <strong>${faltan.toFixed(1)} puntos</strong> (referencial ${ref.toFixed(1)}). ${sems}</p>`;
+        }
 
         if (window._selectedUni === "UNI") {
             document.getElementById("tab-btn-simulacro").style.display = "inline-block";
