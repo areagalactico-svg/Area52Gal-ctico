@@ -302,8 +302,10 @@ window.openModal = async function(type, editData = null, editId = null) {
           <textarea id="field-descripcion" placeholder="Describe el video...">${editData?.descripcion || ""}</textarea>
         </div>
         <div class="form-group">
-          <label>URL de YouTube</label>
-          <input type="url" id="field-url" value="${editData?.url_youtube || ""}" placeholder="https://www.youtube.com/watch?v=...">
+          <label>URL del video (YouTube o TikTok)</label>
+          <input type="url" id="field-url" value="${editData?.url_youtube || ""}" oninput="previewVideoUrl(this.value)" placeholder=https://www.youtube.com/watch?v=...  o  https://www.tiktok.com/@area52uni/video/...">
+          <small style="color: #888;">Pega el enlace tal cual: videos, shorts, lives de YouTube o videos de TikTok. Se reproducen dentro de la plataforma.</small>
+          <div id="url-preview" style="margin-top:0.4rem; font-size:0.85rem;"></div>
         </div>
         <div class="form-group">
           <label>Categoría</label>
@@ -486,6 +488,9 @@ window.openModal = async function(type, editData = null, editId = null) {
   }
 
   overlay.classList.add("active");
+  if (document.getElementById("field-url") && window.previewVideoUrl) {
+    window.previewVideoUrl(document.getElementById("field-url").value);
+  }
 };
 
 window.closeModal = function() {
@@ -573,6 +578,18 @@ function renderExistingMaterialFiles() { renderFileList("existing-material-files
 
 window.removeExistingFile = (i) => { existingFiles.splice(i, 1); renderExistingFiles(); };
 window.removeExistingExamenFile = (i) => { existingFiles.splice(i, 1); renderExistingExamenFiles(); };
+
+window.previewVideoUrl = function(url) {
+  const box = document.getElementById("url-preview");
+  if (!box) return;
+  const u = (url || "").trim();
+  if (!u) { box.innerHTML = ""; return; }
+  const isYt = /youtu\.?be/.test(u);
+  const isTt = /tiktok\.com/.test(u);
+  if (isYt) box.innerHTML = "▶ Detectado: <strong>YouTube</strong> — se reproducirá integrado.";
+  else if (isTt) box.innerHTML = "🎵 Detectado: <strong>TikTok</strong> — se reproducirá integrado.";
+  else box.innerHTML = "🔗 Se guardará como enlace externo.";
+};
 window.removeExistingMaterialFile = (i) => { existingFiles.splice(i, 1); renderExistingMaterialFiles(); };
 
 const TABLE_MAP = {

@@ -67,8 +67,12 @@
     }
 
     function extractTiktokId(url) {
-      const match = url?.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
-      return match ? match[1] : null;
+      const u = (url || "").trim();
+      let match = u.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
+      if (match) return match[1];
+      match = u.match(/tiktok\.com\/(?:t\/|v\/|.*\/video\/)(\d+)/);
+      if (match) return match[1];
+      return null;
     }
 
     function getVideoEmbed(url) {
@@ -134,13 +138,13 @@
             </div>`;
         } else if (video?.type === "tiktok") {
           mediaHtml = `
-            <a href="${v.url_youtube}" target="_blank" style="display: block; text-decoration: none;">
-              <div style="height: 200px; background: linear-gradient(135deg, #010101, #1a1a2e); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 0.5rem; transition: all 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-                <div style="font-size: 3rem;">🎵</div>
-                <div style="font-weight: 600;">Ver en TikTok</div>
-                <div style="font-size: 0.8rem; opacity: 0.7;">Toca para abrir</div>
+            <div class="video-thumb" data-tt="${video.id}" title="Reproducir video de TikTok" style="position: relative; cursor: pointer; aspect-ratio: 16/9; background: #000; overflow: hidden;">
+              <div style="height: 100%; background: linear-gradient(135deg, #010101, #1a1a2e); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 0.3rem;">
+                <div style="font-size: 2.6rem;">🎵</div>
+                <div style="font-weight: 600;">TikTok</div>
               </div>
-            </a>`;
+              <div class="play-btn" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,200,150,0.92); color: white; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; padding-left: 4px;">▶</div>
+            </div>`;
         } else if (video?.type === "link") {
           let host = "";
           try { host = new URL(video.url).hostname.replace(/^www\./, ""); } catch {}
@@ -176,10 +180,15 @@
     document.getElementById("videos-grid").addEventListener("click", (e) => {
       const t = e.target.closest(".video-thumb");
       if (!t) return;
-      const id = t.dataset.yt;
       const iframe = document.createElement("iframe");
-      iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
-      iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+      iframe.style.cssText = "width: 100%; aspect-ratio: 16/9; border: none; display: block;";
+      if (t.dataset.yt) {
+        iframe.src = `https://www.youtube.com/embed/${t.dataset.yt}?autoplay=1&rel=0`;
+        iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+      } else if (t.dataset.tt) {
+        iframe.src = `https://www.tiktok.com/embed/v2/${t.dataset.tt}?autoplay=1`;
+        iframe.allow = "autoplay; encrypted-media; fullscreen";
+      } else return;
       iframe.allowFullscreen = true;
       t.replaceWith(iframe);
     });
