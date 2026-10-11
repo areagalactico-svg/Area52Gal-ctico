@@ -131,30 +131,39 @@
 
         if (video?.type === "youtube") {
           // Vista previa con miniatura real + clic para reproducir (más rápido que N iframes)
+          const coverYt = String(v.portada_url || "").replace(/"/g, "") || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`;
           mediaHtml = `
             <div class="video-thumb" data-yt="${video.id}" title="Reproducir video">
-              <img src="https://i.ytimg.com/vi/${video.id}/hqdefault.jpg" alt="Vista previa del video" loading="lazy" onerror="this.style.display='none'">
+              <img src="${coverYt}" alt="Vista previa del video" loading="lazy" onerror="this.style.display='none'">
               <div class="play-btn">▶</div>
             </div>`;
         } else if (video?.type === "tiktok") {
-          mediaHtml = `
-            <div class="video-thumb" data-tt="${video.id}" title="Reproducir video de TikTok" style="position: relative; cursor: pointer; aspect-ratio: 16/9; background: #000; overflow: hidden;">
-              <div style="height: 100%; background: linear-gradient(135deg, #010101, #1a1a2e); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 0.3rem;">
+          const coverTt = String(v.portada_url || "").replace(/"/g, "");
+          const fondoTt = coverTt
+            ? `<img src="${coverTt}" alt="Portada del video" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'">`
+            : `<div style="height: 100%; background: linear-gradient(135deg, #010101, #1a1a2e); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; gap: 0.3rem;">
                 <div style="font-size: 2.6rem;">🎵</div>
                 <div style="font-weight: 600;">TikTok</div>
-              </div>
+              </div>`;
+          mediaHtml = `
+            <div class="video-thumb" data-tt="${video.id}" title="Reproducir video de TikTok" style="position: relative; cursor: pointer; aspect-ratio: 16/9; background: #000; overflow: hidden;">
+              ${fondoTt}
               <div class="play-btn" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,200,150,0.92); color: white; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; padding-left: 4px;">▶</div>
             </div>`;
         } else if (video?.type === "link") {
           let host = "";
           try { host = new URL(video.url).hostname.replace(/^www\./, ""); } catch {}
-          mediaHtml = `
-            <a href="${video.url}" target="_blank" style="display: block; text-decoration: none;">
-              <div style="height: 200px; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #333; gap: 0.5rem;">
+          const coverLink = String(v.portada_url || "").replace(/"/g, "");
+          const fondoLink = coverLink
+            ? `<img src="${coverLink}" alt="Portada del video" loading="lazy" style="width: 100%; height: 200px; object-fit: cover; display: block;" onerror="this.style.display='none'">`
+            : `<div style="height: 200px; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #333; gap: 0.5rem;">
                 <div style="font-size: 3rem;">▶️</div>
                 <div style="font-weight: 600;">Ver video</div>
                 <div style="font-size: 0.8rem; color: #888;">${host ? "Abrir en " + host : "Toca para abrir enlace"}</div>
-              </div>
+              </div>`;
+          mediaHtml = `
+            <a href="${video.url}" target="_blank" style="display: block; text-decoration: none;">
+              ${fondoLink}
             </a>`;
         } else {
           mediaHtml = '<div style="height: 200px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888;">Video no disponible</div>';

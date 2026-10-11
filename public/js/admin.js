@@ -308,6 +308,11 @@ window.openModal = async function(type, editData = null, editId = null) {
           <div id="url-preview" style="margin-top:0.4rem; font-size:0.85rem;"></div>
         </div>
         <div class="form-group">
+          <label>Portada (opcional)</label>
+          <input type="url" id="field-portada" value="${editData?.portada_url || ""}" placeholder="https://.../portada.jpg">
+          <small style="color: #888;">Si lo dejas vacío se usa la miniatura automática (YouTube) o el fondo TikTok. Ideal para enlaces acortados vt.tiktok.com.</small>
+        </div>
+        <div class="form-group">
           <label>Categoría</label>
           <select id="field-categoria">
             <option value="Matemáticas" ${editData?.categoria === "Matemáticas" ? "selected" : ""}>Matemáticas</option>
@@ -586,9 +591,34 @@ window.previewVideoUrl = function(url) {
   if (!u) { box.innerHTML = ""; return; }
   const isYt = /youtu\.?be/.test(u);
   const isTt = /tiktok\.com/.test(u);
-  if (isYt) box.innerHTML = "▶ Detectado: <strong>YouTube</strong> — se reproducirá integrado.";
-  else if (isTt) box.innerHTML = "🎵 Detectado: <strong>TikTok</strong> — se reproducirá integrado.";
-  else box.innerHTML = "🔗 Se guardará como enlace externo.";
+  if (isYt) {
+    box.innerHTML = "▶ Detectado: <strong>YouTube</strong> — se reproducirá integrado.";
+    return;
+  }
+  if (isTt) {
+    if (/\/video\/\d{5,}/.test(u)) {
+      box.innerHTML = "🎵 Detectado: <strong>TikTok</strong> — se reproducirá integrado.";
+      return;
+    }
+    box.innerHTML = "🎵 Enlace acortado de TikTok: resolviendo...";
+    fetch("/api/resolve-tiktok", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: u })
+    }).then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+      const field = document.getElementById("field-url");
+      if (!field || field.value.trim() !== u) return; // el usuario ya cambió el valor
+      if (ok && d.id) {
+        field.value = d.canonical || u;
+        box.innerHTML = "✅ Resuelto: <strong>TikTok</strong> — se reproducirá integrado. Tip: agrega una portada abajo para que se vea la miniatura.";
+      } else {
+        box.innerHTML = "🎵 <strong>TikTok</strong> (enlace corto sin resolver). Se abrirá como enlace externo salvo que agregues una <strong>portada</strong> abajo — igual se verá bien en la lista.";
+      }
+    }).catch(() => {
+      box.innerHTML = "🎵 <strong>TikTok</strong> — se abrirá como enlace. Agrega una portada para la miniatura.";
+    });
+    return;
+  }
+  box.innerHTML = "🔗 Se guardará como enlace externo.";
 };
 window.removeExistingMaterialFile = (i) => { existingFiles.splice(i, 1); renderExistingMaterialFiles(); };
 
@@ -646,7 +676,8 @@ async function saveItem() {
     case "video":
       data.titulo = document.getElementById("field-titulo").value;
       data.descripcion = document.getElementById("field-descripcion").value;
-      data.url_youtube = document.getElementById("field-url").value;
+      data.url_youtube = document.getElementById("field-url").value.trim();
+      data.portada_url = document.getElementById("field-portada")?.value.trim() || "";
       data.categoria = document.getElementById("field-categoria").value;
       break;
 
