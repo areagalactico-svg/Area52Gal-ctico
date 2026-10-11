@@ -305,8 +305,8 @@
     <!-- Modal Login Estudiante -->
     <div id="student-login-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:200; justify-content:center; align-items:center;">
         <div style="background:white; border-radius:16px; padding:2.5rem; max-width:420px; width:90%; box-shadow:0 10px 40px rgba(0,0,0,0.3); text-align:center;">
-            <h2 style="color:#1a1a2e; margin-bottom:0.5rem;">Acceder al Simulacro IEN</h2>
-            <p style="color:#888; margin-bottom:1.5rem; font-size:0.9rem;">Ingresa tus datos para participar del simulacro</p>
+            <h2 style="color:#1a1a2e; margin-bottom:0.5rem;">Crea tu cuenta gratis 🎓</h2>
+            <p style="color:#888; margin-bottom:1.5rem; font-size:0.9rem;">Regístrate para guardar tu avance, tus notas y tu guía personalizada. Sin confirmar correo.</p>
             <div id="student-login-form">
                 <input type="text" id="student-nombre" placeholder="Nombre completo" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
                 <input type="tel" id="student-whatsapp" placeholder="Numero de WhatsApp (ej: 933884059)" style="width:100%; padding:0.8rem; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; margin-bottom:0.8rem; box-sizing:border-box;">
@@ -322,7 +322,7 @@
                 <button onclick="studentLogout()" style="padding:0.6rem 1.5rem; background:white; color:#e74c3c; border:2px solid #e74c3c; border-radius:8px; font-weight:bold; cursor:pointer;">Cerrar sesion</button>
             </div>
             <p id="student-login-error" style="color:#e74c3c; margin-top:0.8rem; font-size:0.85rem; display:none;"></p>
-            <button onclick="closeStudentLogin()" style="margin-top:1rem; background:none; border:none; color:#888; cursor:pointer; font-size:0.9rem;">Cancelar</button>
+            <button onclick="closeStudentLogin()" style="margin-top:1rem; background:none; border:none; color:#888; cursor:pointer; font-size:0.9rem;">Explorar sin registrarme</button>
         </div>
     </div>
 
@@ -367,6 +367,7 @@
 
         window.closeStudentLogin = function() {
             document.getElementById("student-login-modal").style.display = "none";
+            sessionStorage.setItem("area52_inv", "1");
         };
 
         window.studentLogin = async function() {
@@ -461,12 +462,28 @@
                     errorEl.textContent = error.message.includes("already") ? "Este correo ya esta registrado. Inicia sesion." : error.message;
                     errorEl.style.display = "block";
                 } else {
+                    window._studentUser = data.user;
                     window._studentNombre = nombre;
                     window._studentWhatsapp = whatsapp;
                     localStorage.setItem("area52_student", JSON.stringify({ email: email, nombre: nombre, whatsapp: whatsapp }));
-                    errorEl.textContent = "Cuenta creada! Ya puedes iniciar sesion.";
-                    errorEl.style.display = "block";
-                    errorEl.style.color = "#00c896";
+                    // Registro sin confirmación: si Supabase devolvió sesión, entra directo
+                    if (data.session) {
+                        showStudentLogged();
+                        document.getElementById("student-login-modal").style.display = "none";
+                        const _pt = window._pendingTab || "avance";
+                        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+                        const _btn = document.querySelector('.tab-btn[data-tab="' + _pt + '"]');
+                        if (_btn) _btn.classList.add("active");
+                        const _tab = document.getElementById("tab-" + _pt);
+                        if (_tab) _tab.classList.add("active");
+                        if (_pt === "simulacro" && window._loadSimulacrosIEN) window._loadSimulacrosIEN();
+                        if (_pt === "avance" && window._loadMiAvance) window._loadMiAvance();
+                    } else {
+                        errorEl.textContent = "Cuenta creada! Revisa tu correo para confirmar e inicia sesión.";
+                        errorEl.style.display = "block";
+                        errorEl.style.color = "#00c896";
+                    }
                 }
             } catch(e) {
                 errorEl.textContent = "Error de conexion. Intenta de nuevo.";
@@ -523,6 +540,15 @@
                     }
                 }
             } catch(e) {}
+            // Registro al ingresar: si no hay sesión, abrir el registro automáticamente
+            if (!window._studentUser && !sessionStorage.getItem("area52_inv")) {
+                setTimeout(() => {
+                    if (!window._studentUser && !sessionStorage.getItem("area52_inv")) {
+                        checkStudentSession();
+                        document.getElementById("student-login-modal").style.display = "flex";
+                    }
+                }, 1500);
+            }
         }
         window.initStudentSession = initStudentSession;
     </script>
