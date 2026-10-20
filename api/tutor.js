@@ -6,7 +6,8 @@
 // su universidad (temarios + banco de preguntas).
 // Body: {
 //   estudiante_email?, nombre?, universidad?,
-//   modo?: "explicar" | "practicar" | "socratico" | "errores",
+//   modo?: "explicar" | "practicar" | "socratico" | "errores" | "pista" | "corregir",
+//   pista_n?: 1|2|3   (solo modo "pista": nivel de pista escalonada),
 //   tema?: string, mensaje: string, historial?: [{role, content}]
 // }
 // ============================================================
@@ -121,7 +122,20 @@ const MODOS = {
   practicar: "PRACTICAR: plantea 3 ejercicios graduados (fácil→examen real). Da el primero, espera su respuesta, corrige y recién avanza al siguiente.",
   socratico: "SOCRÁTICO: no des la respuesta directa; guía con preguntas cortas hasta que el estudiante la descubra. Si se atasca 2 veces, da una pista y luego explica.",
   errores: "REPASO DE ERRORES: el estudiante falla mucho estos subtemas. Re-enseña cada uno con un ejemplo nuevo y distinto al del examen, verifica con 1 pregunta.",
+  pista: "PISTA ESCALONADA: el estudiante está atascado en un problema. Nunca des la respuesta completa de entrada: entrega SOLO el nivel de pista solicitado (instrucción dinámica por pista_n).",
+  corregir: "CORRECCIÓN DE PROCEDIMIENTO: el estudiante pega su desarrollo paso a paso (texto o foto transcrita). Identifica EXACTAMENTE en qué línea se equivoca (signo, despeje, fórmula, concepto, salto de paso), aunque la respuesta final sea correcta por coincidencia. Estructura tu respuesta: 1) Veredicto en 1 línea (correcto / error en la línea N), 2) La línea errónea tal como la escribió él + por qué está mal, 3) Corrección de esa línea y de las siguientes si siguen afectadas, 4) Validación: si su método alternativo es matemáticamente válido, dilo; si el error es solo de cálculo final, reconoce que el razonamiento estaba bien. Sé concreto: no reescribes todo el procedimiento si solo una línea falla.",
 };
+
+// Instrucciones de la PISTA ESCALONADA según el nivel pedido (1→2→3)
+function instruccionPista(n) {
+  const nivel = Math.min(Math.max(parseInt(n) || 1, 1), 3);
+  const niveles = {
+    1: "PISTA 1/3 — CONCEPTUAL: nombra el concepto, fórmula o artificio que hay que usar y por qué encaja aquí, pero NO resuelvas ni digas el primer paso numérico. El estudiante debe dar el siguiente paso solo. Máximo 4 líneas. Termina preguntándole qué haría primero.",
+    2: "PISTA 2/3 — DE PROCEDIMIENTO: indica el primer paso concreto (qué datos combinar, qué despejar, qué trazo dibujar) con la fórmula armada, pero NO ejecutes los cálculos ni des el resultado. Máximo 6 líneas. Termina pidiéndole que lo intente.",
+    3: "DESARROLLO COMPLETO: ya usó sus pistas; resuelve el problema paso a paso con los porqués de cada paso, señalando en qué punto se habría atascado y qué error típico evitar. Cierra con 1 pregunta corta para verificar que entendió.",
+  };
+  return `PISTA ESCALONADA (nivel actual ${nivel}/3): ${niveles[nivel]}`;
+}
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -145,6 +159,9 @@ module.exports = async function handler(req, res) {
 
   const [perfil, material] = await Promise.all([perfilEstudiante(email, universidad), contextoMaterial(universidad, tema || mensaje)]);
 
+  // Modo pista: la instrucción depende del nivel solicitado (1→2→3)
+  const modoInstruccion = modo === "pista" ? instruccionPista(body.pista_n) : MODOS[modo];
+
   const nivel =
     !perfil.hay_datos || perfil.promedio === null
       ? "desconocido (primera sesión: haz 1 pregunta diagnóstica antes de enseñar)"
@@ -160,7 +177,8 @@ ${perfil.debiles.length ? `ÁREAS MÁS DÉBILES: ${perfil.debiles.map((d) => `${
 ${perfil.errores_top.length ? `SUBTEMAS DONDE MÁS FALLA: ${perfil.errores_top.join(", ")}.` : ""}
 ${perfil.focos.length ? `FOCOS DE SU GUÍA: ${perfil.focos.join(" · ")}.` : ""}
 ${perfil.diagnostico ? `DIAGNÓSTICO PREVIO: ${perfil.diagnostico}` : ""}
-MODO DE ENSEÑANZA DE ESTA SESIÓN: ${MODOS[modo]}
+${modo === "pista" ? "" : `MODO DE ENSEÑANZA DE ESTA SESIÓN: ${modoInstruccion}`}
+${modo === "pista" ? `MODO PISTA ESCALONADA — ${modoInstruccion}\nLa respuesta DEBE empezar con el encabezado exacto correspondiente: "💡 Pista 1/3", "💡 Pista 2/3" o "✅ Desarrollo completo". No des la solución en los niveles 1 y 2.` : ""}
 ${tema ? `TEMA DE LA SESIÓN: ${tema}.` : ""}
 MATERIAL REAL DE REFERENCIA (temario y preguntas tipo de ${universidad}; basa tus ejemplos en esto, no inventes temarios de otras universidades):
 ${material || "Sin material registrado aún: enseña con tu conocimiento del examen de admisión de " + universidad + "."}

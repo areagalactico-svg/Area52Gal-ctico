@@ -177,6 +177,7 @@
                 <div id="avance-countdown" style="margin-bottom:1.2rem;"></div>
                 <div id="avance-resumen"></div>
                 <div id="avance-plan" style="margin-top:1.2rem;"></div>
+                <div id="avance-plan-semanal" style="margin-top:1.2rem;"></div>
                 <div id="avance-evolucion" style="margin-top:1.2rem;"></div>
                 <div id="avance-areas" style="margin-top:1.2rem;"></div>
                 <div id="avance-guias" style="margin-top:1.2rem;"></div>
@@ -198,6 +199,11 @@
                         <button class="filter-btn" data-modo="practicar" onclick="tutorSetModo('practicar', this)">✏️ Practicar</button>
                         <button class="filter-btn" data-modo="socratico" onclick="tutorSetModo('socratico', this)">❓ Descubrir</button>
                         <button class="filter-btn" data-modo="errores" onclick="tutorSetModo('errores', this)">🔁 Mis errores</button>
+                        <button class="filter-btn" data-modo="pista" onclick="tutorPista(this)">💡 Dame una pista</button>
+                        <button class="filter-btn" data-modo="corregir" onclick="tutorSetModo('corregir', this)">✅ Corrige mi solución</button>
+                    </div>
+                    <div id="tutor-pista-line" style="display:none; background:#f5f0ff; border-radius:8px; padding:0.5rem 0.8rem; font-size:0.86rem; margin-bottom:0.6rem; color:#8e7cc3;">
+                        💡 Pista escalonada: nivel <strong id="tutor-pista-nivel">1</strong>/3 — cada clic revela un poco más (la 3.ª es el desarrollo completo).
                     </div>
                     <div id="tutor-tema-line" style="display:none; background:#f0faf7; border-radius:8px; padding:0.5rem 0.8rem; font-size:0.88rem; margin-bottom:0.6rem;">
                         Tema: <strong id="tutor-tema"></strong> <span style="color:#00a37a; cursor:pointer; margin-left:0.5rem;" onclick="tutorClearTema()">✕ quitar</span>
@@ -682,6 +688,8 @@
         let simulacroCurrentTest = null;
         let simulacroAnswers = {};
         let simulacroStartTime = null;
+        // Estrategia: orden de ataque + tiempos de respuesta por pregunta
+        let simulacroTiempos = null; // { primer: {}, ultimo: {}, orden: [] }
 
         async function fetchSimulacroContext(materia) {
             const ienMaterias = ['Matemática', 'Física', 'Química', 'Razonamiento Verbal', 'Razonamiento Matemático', 'Humanidades'];
@@ -906,6 +914,7 @@
             simulacroCurrentTest = data;
             simulacroAnswers = {};
             simulacroStartTime = new Date();
+            simulacroTiempos = { primer: {}, ultimo: {}, orden: [] };
             registrarVistas(window._selectedUni || data.universidad || "UNI", data.preguntas || []);
             document.getElementById("simulacro-list-area").style.display = "none";
             const testArea = document.getElementById("simulacro-test-area");
@@ -963,7 +972,7 @@
                 const subTag = q.subtema ? `<span style="display:inline-block;background:#f0f0f0;color:#333;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;margin-left:0.3rem;margin-bottom:0.5rem;">${q.subtema}</span>` : '';
                 html += `<div class="simulacro-question"><div>${areaTag}${subTag}</div><h3>${qi + 1}. ${q.texto}</h3>`;
                 q.opciones.forEach((o, oi) => {
-                    html += `<label class="simulacro-option"><input type="radio" name="sq-${qi}" value="${oi}" onchange="simulacroAnswers[${qi}] = ${oi}; updateSimulacroProgress()"><span>${o}</span></label>`;
+                    html += `<label class="simulacro-option"><input type="radio" name="sq-${qi}" value="${oi}" onchange="fijarRespuesta(${qi}, ${oi})"><span>${o}</span></label>`;
                 });
                 html += `</div>`;
             });
@@ -971,6 +980,22 @@
             area.innerHTML = html;
             window.simulacroAnswers = simulacroAnswers;
         }
+
+        // Registra respuesta + hora de primer/último toque y orden de ataque
+        // (alimenta el Analizador de Estrategia de Resolución)
+        window.fijarRespuesta = function(qi, oi) {
+            simulacroAnswers[qi] = oi;
+            if (simulacroTiempos) {
+                const t = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
+                if (simulacroTiempos.primer[qi] === undefined) {
+                    simulacroTiempos.primer[qi] = t;
+                    simulacroTiempos.orden.push(qi);
+                }
+                simulacroTiempos.ultimo[qi] = t;
+            }
+            window.simulacroAnswers = simulacroAnswers;
+            updateSimulacroProgress();
+        };
 
         window.updateSimulacroProgress = function() {
             const total = simulacroCurrentTest.preguntas.length;
@@ -1051,6 +1076,265 @@
             const nota = Math.max(0, Math.min(20, (puntajeTotal / maxPuntaje) * 20));
             return { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed: elapsedSec };
         }
+
+        // ============================================================
+        // ANALIZADOR DE ESTRATEGIAS DE RESOLUCIÓN DE EXÁMENES
+        // Audita: orden de ataque, tiempo invertido por pregunta,
+        // impacto del puntaje negativo, preguntas en blanco y genera
+        // simuladores what-if ("¿y si...?") con los datos reales.
+        // ============================================================
+        const SCORING_ESTRATEGIA = {
+            'PE1': { correct: 2.00, wrong: -0.20 },
+            'PE2': { correct: 2.50, wrong: -0.25 },
+            'PE3': { correct: 2.50, wrong: -0.25 },
+            'default': { correct: 2.00, wrong: -0.20 }
+        };
+        const clamp20 = (n) => Math.max(0, Math.min(20, n));
+
+        function analizarEstrategia(test, answers, tiempos, elapsed) {
+            const det = [];
+            let puntaje = 0, maxPts = 0;
+            const areaAcc = {};
+            test.preguntas.forEach((q, qi) => {
+                const sel = answers[qi];
+                const isBlank = sel === undefined || sel === null;
+                const isCorrect = !isBlank && sel === q.respuestaCorrecta;
+                const a = q.area || 'default';
+                const sc = SCORING_ESTRATEGIA[q.area] || SCORING_ESTRATEGIA.default;
+                const pts = isCorrect ? sc.correct : (isBlank ? 0 : sc.wrong);
+                puntaje += pts;
+                maxPts += sc.correct;
+                areaAcc[a] = areaAcc[a] || { c: 0, t: 0, blanks: 0 };
+                areaAcc[a].t++;
+                if (isCorrect) areaAcc[a].c++;
+                else if (isBlank) areaAcc[a].blanks++;
+                det.push({ qi, area: q.area || '', isCorrect, isBlank, wrong: !isBlank && !isCorrect, pts });
+            });
+
+            const nota = clamp20((puntaje / maxPts) * 20);
+            const hallazgos = [];
+            const escenarios = [];
+
+            // --- 1) Impacto del puntaje negativo ---
+            const erradas = det.filter(d => d.wrong);
+            const perdido = erradas.reduce((s, d) => s + Math.abs(d.pts), 0);
+            if (erradas.length) {
+                const notaSin = clamp20(((puntaje + perdido) / maxPts) * 20);
+                hallazgos.push(`❌ ${erradas.length} incorrecta${erradas.length > 1 ? "s" : ""} = <strong>-${perdido.toFixed(2)} puntos</strong> por penalización. En el IEN el blanco no resta: si no te giras, déjala en blanco.`);
+                escenarios.push({ nombre: "Si tus incorrectas hubieran quedado en blanco (sin penalización)", nota: notaSin, delta: notaSin - nota });
+            }
+
+            // --- 2) Preguntas en blanco + escenario de respuesta con tu nivel ---
+            const blancas = det.filter(d => d.isBlank);
+            const gananciaBlancas = () => {
+                let g = 0;
+                const porArea = {};
+                blancas.forEach(d => { const a = d.area || 'default'; porArea[a] = (porArea[a] || 0) + 1; });
+                for (const [a, n] of Object.entries(porArea)) {
+                    const acc = areaAcc[a] ? areaAcc[a].c / Math.max(1, areaAcc[a].t) : 0;
+                    const sc = SCORING_ESTRATEGIA[a] || SCORING_ESTRATEGIA.default;
+                    g += n * (acc * sc.correct + (1 - acc) * sc.wrong);
+                }
+                return g;
+            };
+            if (blancas.length) {
+                hallazgos.push(`⬜ ${blancas.length} pregunta${blancas.length > 1 ? "s" : ""} sin responder: N° ${blancas.map(d => d.qi + 1).join(", ")}. Son puntos regalados que no cobraste.`);
+                const notaB = clamp20(((puntaje + gananciaBlancas()) / maxPts) * 20);
+                escenarios.push({ nombre: `Responder tus ${blancas.length} en blanco con tu nivel por área`, nota: notaB, delta: notaB - nota });
+            }
+
+            // --- 3) Tiempo mal invertido (requiere tiempos del examen en vivo) ---
+            let tiempoRecuperable = 0;
+            if (tiempos && Array.isArray(tiempos.orden) && tiempos.orden.length) {
+                const dwell = {};
+                let prev = 0;
+                tiempos.orden.forEach(qi => {
+                    const fin = tiempos.ultimo[qi] ?? prev;
+                    dwell[qi] = Math.max(1, fin - prev);
+                    prev = fin;
+                });
+                const lentas = det.filter(d => dwell[d.qi] !== undefined && d.wrong && dwell[d.qi] >= 90)
+                    .sort((a, b) => dwell[b.qi] - dwell[a.qi]);
+                const mediaPorPreg = Math.max(15, elapsed / Math.max(1, test.preguntas.length));
+                if (lentas.length) {
+                    const totalLenta = lentas.reduce((s, d) => s + dwell[d.qi], 0);
+                    const peor = lentas[0];
+                    hallazgos.push(`⏱ Dedicaste ${Math.round(dwell[peor.qi])}s a la pregunta ${peor.qi + 1}${peor.area ? ` (${peor.area})` : ""} y la fallaste${lentas.length > 1 ? `, junto con ${lentas.length - 1} pregunta(s) lenta(s) más fallada(s)` : ""}: ~${Math.round(totalLenta / 60)} min perdidos. Con tu ritmo de ${Math.round(mediaPorPreg)}s/pregunta, ese tiempo alcanzaba para intentar <strong>${Math.round(totalLenta / mediaPorPreg)} pregunta(s) más</strong>.`);
+                    tiempoRecuperable = lentas.reduce((s, d) => s + Math.max(0, dwell[d.qi] - 45), 0);
+                }
+                // Escenario: recuperar ese tiempo para los blancos
+                if (blancas.length && tiempoRecuperable >= 30) {
+                    const extras = Math.min(blancas.length, Math.floor(tiempoRecuperable / mediaPorPreg));
+                    if (extras > 0) {
+                        let g = 0, usadas = 0;
+                        const porArea = {};
+                        blancas.forEach(d => { const a = d.area || 'default'; porArea[a] = (porArea[a] || 0) + 1; });
+                        for (const [a, n] of Object.entries(porArea)) {
+                            const k = Math.min(n, extras - usadas);
+                            if (k <= 0) break;
+                            const acc = areaAcc[a] ? areaAcc[a].c / Math.max(1, areaAcc[a].t) : 0;
+                            const sc = SCORING_ESTRATEGIA[a] || SCORING_ESTRATEGIA.default;
+                            g += k * (acc * sc.correct + (1 - acc) * sc.wrong);
+                            usadas += k;
+                        }
+                        const notaT = clamp20(((puntaje + g) / maxPts) * 20);
+                        if (usadas > 0) escenarios.push({ nombre: `Saltar antes las preguntas lentas falladas y usar ese tiempo en ${usadas} de tus blancos`, nota: notaT, delta: notaT - nota });
+                    }
+                }
+                // --- 4) Orden de ataque ---
+                const primeraArea = det.find(d => d.qi === tiempos.orden[0])?.area || "";
+                const ranking = Object.entries(areaAcc)
+                    .filter(([a]) => a !== 'default')
+                    .map(([a, d]) => ({ a, pct: Math.round((d.c / Math.max(1, d.t)) * 100), first: (function () { let f = 0; tiempos.orden.forEach((qi, idx) => { if (f === 0 && det[qi] && det[qi].area === a) f = idx + 1; }); return f; })() }))
+                    .sort((x, y) => y.pct - x.pct);
+                if (ranking.length > 1) {
+                    if (primeraArea && ranking[0] && ranking[0].a !== primeraArea) {
+                        const suyo = ranking.find(r => r.a === primeraArea);
+                        hallazgos.push(`🧭 Empezaste por <strong>${primeraArea}</strong> (${suyo ? suyo.pct : 0}% de acierto aquí), pero tu área más segura es <strong>${ranking[0].a}</strong> (${ranking[0].pct}%). En el examen ataca primero donde aciertas más: puntos asegurados antes que puntos difíciles.`);
+                    }
+                    const desorden = ranking.filter(r => r.first > 0).sort((x, y) => x.first - y.first).map(r => r.a);
+                    const ideal = ranking.map(r => r.a);
+                    if (desorden.join(">") !== ideal.join(">")) {
+                        hallazgos.push(`🗺 Orden usado: ${desorden.join(" → ")} · Orden óptimo sugerido: <strong>${ideal.join(" → ")}</strong> (de tu mayor a menor porcentaje de acierto).`);
+                    }
+                }
+            }
+
+            return {
+                nota,
+                notaSinPenalizacion: escenarios[0] ? escenarios[0].nota : nota,
+                hallazgos,
+                escenarios,
+                orden_ataque: Object.entries(areaAcc)
+                    .filter(([a]) => a !== 'default')
+                    .map(([a, d]) => `${a} — ${Math.round((d.c / Math.max(1, d.t)) * 100)}%`),
+            };
+        }
+
+        function buildEstrategiaHTML(est) {
+            if (!est || (!est.hallazgos || !est.hallazgos.length) && !est.escenarios.length) return "";
+            return `
+                <div style="margin:1.5rem 0; text-align:left; max-width:700px; margin-left:auto; margin-right:auto; background:#f5f9ff; border:1px solid #cce5ff; border-radius:12px; padding:1.2rem 1.4rem;">
+                    <h3 style="color:#1a1a2e; margin-bottom:0.6rem;">🧠 Tu estrategia de examen</h3>
+                    ${(est.hallazgos || []).map(h => `<p style="font-size:0.9rem; color:#333; margin:0.4rem 0;">${h}</p>`).join("")}
+                    ${est.escenarios && est.escenarios.length ? `
+                        <table style="width:100%; border-collapse:collapse; font-size:0.87rem; margin-top:0.8rem;">
+                            <thead><tr style="background:#e7effb; color:#1a1a2e;">
+                                <th style="padding:0.5rem; text-align:left;">Simulación "¿y si...?"</th>
+                                <th style="padding:0.5rem; text-align:center;">Nota</th>
+                                <th style="padding:0.5rem; text-align:center;">Δ</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr style="border-bottom:1px solid #e3eaf5; background:#fff;">
+                                    <td style="padding:0.5rem;">Tu nota real</td>
+                                    <td style="padding:0.5rem; text-align:center; font-weight:bold;">${Number(est.nota).toFixed(1)}</td>
+                                    <td style="padding:0.5rem; text-align:center; color:#888;">—</td>
+                                </tr>
+                                ${est.escenarios.map(s => `
+                                <tr style="border-bottom:1px solid #e3eaf5;">
+                                    <td style="padding:0.5rem;">${s.nombre}</td>
+                                    <td style="padding:0.5rem; text-align:center; font-weight:bold; color:${s.delta >= 0 ? "#00a37a" : "#e74c3c"};">${Number(s.nota).toFixed(1)}</td>
+                                    <td style="padding:0.5rem; text-align:center; color:${s.delta >= 0 ? "#00a37a" : "#e74c3c"};">${s.delta >= 0 ? "+" : ""}${Number(s.delta).toFixed(1)}</td>
+                                </tr>`).join("")}
+                            </tbody>
+                        </table>
+                        <p style="font-size:0.76rem; color:#888; margin-top:0.5rem;">Estimaciones calculadas con tus datos reales de este simulacro (tu % de acierto por área y tu ritmo). No garantizan el resultado final.</p>` : ""}
+                </div>`;
+        }
+
+        // ============================================================
+        // CLOTADOR INFINITO DE PROBLEMAS — misma estructura, datos
+        // nuevos, con selector de dificultad (más fácil / igual /
+        // más difícil). Botones en el solucionario y en el cuaderno.
+        // ============================================================
+        window._clones = {};
+
+        window.abrirClonResultado = function(i) {
+            const d = (window._ultimoResultado && window._ultimoResultado.state && window._ultimoResultado.state.details || [])[i];
+            if (!d) return;
+            pintarSelectorClon("clon-box-r-" + i, { texto: d.texto, opciones: d.opciones, respuestaCorrecta: d.correct, area: d.area, subtema: d.subtema }, true);
+        };
+        window.abrirClonError = function(ei) {
+            const e = (window._erroresVisibles || [])[ei];
+            if (!e) return;
+            pintarSelectorClon("clon-box-e-" + ei, { texto: e.texto, opciones: e.opciones, respuestaCorrecta: e.respuesta_correcta, area: e.area, subtema: e.subtema }, true);
+        };
+        window.pintarSelectorClon = function(boxId, q, toggle) {
+            const box = document.getElementById(boxId);
+            if (!box) return;
+            if (toggle && box.dataset.abierto === "1") {
+                box.innerHTML = "";
+                delete box.dataset.abierto;
+                delete window._clones[boxId];
+                return;
+            }
+            box.dataset.abierto = "1";
+            window._clones[boxId] = q;
+            const btn = (nivel, txt) => `<button class="filter-btn" style="font-size:0.8rem; padding:0.3rem 0.8rem;" onclick="generarClon('${boxId}','${nivel}')">${txt}</button>`;
+            box.innerHTML = `<div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center; background:#f8f5ff; border:1px dashed #8e7cc3; border-radius:8px; padding:0.6rem 0.8rem; margin-top:0.6rem;">
+                <span style="font-size:0.82rem; color:#8e7cc3; font-weight:bold;">🌀 Nivel del clon:</span>
+                ${btn("facil", "⬇ Más fácil (afianzar)")}${btn("igual", "＝ Igual")} ${btn("dificil", "⬆ Más difícil (examen)")}
+            </div>`;
+        }
+        window.generarClon = async function(boxId, nivel) {
+            const q = window._clones[boxId];
+            const box = document.getElementById(boxId);
+            if (!q || !box) return;
+            box.dataset.abierto = "1";
+            box.innerHTML = `<p style="color:#8e7cc3; font-size:0.88rem; margin-top:0.6rem;">🌀 La IA está clonando tu problema con datos nuevos...</p>`;
+            try {
+                const email = await resolveStudentEmail();
+                const res = await fetch("/api/clone-problem", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        texto: q.texto, opciones: q.opciones, respuestaCorrecta: q.respuestaCorrecta,
+                        area: q.area, subtema: q.subtema,
+                        universidad: window._selectedUni || "UNI",
+                        nivel, cantidad: 1, estudiante_email: email
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.preguntas || !data.preguntas.length) throw new Error(data.error || "Error al clonar");
+                pintarClon(boxId, data.preguntas[0], nivel);
+            } catch (e) {
+                box.innerHTML = `<p style="color:#e74c3c; font-size:0.88rem; margin-top:0.6rem;">No pude clonar el problema: ${escAv(e.message)}.
+                    <button class="filter-btn" style="font-size:0.78rem;" onclick="generarClon('${boxId}','${nivel}')">Reintentar</button>
+                    <button class="filter-btn" style="font-size:0.78rem;" onclick="pintarSelectorClon('${boxId}', window._clones['${boxId}'], true)">Volver</button></p>`;
+            }
+        };
+        function pintarClon(boxId, p, nivel) {
+            const box = document.getElementById(boxId);
+            window._clones[boxId + "_actual"] = p;
+            const nivelTxt = { facil: "más fácil", igual: "mismo nivel", dificil: "más difícil" }[nivel] || nivel;
+            box.innerHTML = `<div style="background:#f8f5ff; border:1px dashed #8e7cc3; border-radius:8px; padding:1rem; margin-top:0.6rem;">
+                <p style="font-size:0.78rem; color:#8e7cc3; font-weight:bold; margin-bottom:0.5rem;">🌀 CLON · nivel ${nivelTxt} · misma estructura, datos nuevos</p>
+                <p style="color:#333; margin-bottom:0.7rem;"><strong>Problema:</strong> ${escAv(p.texto)}</p>
+                <div id="${boxId}-opts">${(p.opciones || []).map((o, oi) =>
+                    `<button class="filter-btn" style="display:block; width:100%; text-align:left; margin-bottom:0.35rem; font-size:0.85rem; font-weight:normal;" onclick="verificarClon('${boxId}', ${oi})">${escAv(o)}</button>`).join("")}
+                </div>
+                <div id="${boxId}-ver"></div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.7rem;">
+                    <button class="filter-btn" style="font-size:0.78rem;" onclick="generarClon('${boxId}','${nivel}')">🌀 Otro clon</button>
+                    <button class="filter-btn" style="font-size:0.78rem;" onclick="pintarSelectorClon('${boxId}', window._clones['${boxId}'], true)">Cambiar nivel</button>
+                </div>
+            </div>`;
+        }
+        window.verificarClon = function(boxId, elegido) {
+            const p = window._clones[boxId + "_actual"];
+            const ver = document.getElementById(boxId + "-ver");
+            const optsBox = document.getElementById(boxId + "-opts");
+            if (!p || !ver || !optsBox) return;
+            const ok = elegido === p.respuestaCorrecta;
+            optsBox.innerHTML = (p.opciones || []).map((o, oi) => {
+                let marca = "", estilo = "font-weight:normal; color:#888;";
+                if (oi === p.respuestaCorrecta) { marca = " ✔"; estilo = "font-weight:bold; color:#00a37a;"; }
+                else if (oi === elegido) { marca = " ✘ (tu elección)"; estilo = "font-weight:bold; color:#e74c3c;"; }
+                return `<div style="padding:0.4rem 0.6rem; border:1px solid ${oi === p.respuestaCorrecta ? "#00c896" : oi === elegido ? "#e74c3c" : "#eee"}; border-radius:6px; margin-bottom:0.3rem; font-size:0.85rem; ${estilo}">${escAv(o)}${marca}</div>`;
+            }).join("");
+            ver.innerHTML = `<p style="font-weight:bold; color:${ok ? "#00a37a" : "#e74c3c"}; font-size:0.9rem; margin-top:0.4rem;">${ok ? "✅ ¡Correcto! Dominas esta estructura." : "❌ Respuesta incorrecta. La correcta está marcada en verde."}</p>
+                ${(p.pasos && p.pasos.length) ? `<details style="margin-top:0.4rem;"><summary style="cursor:pointer; color:#8e7cc3; font-size:0.85rem; font-weight:bold;">Ver resolución paso a paso</summary><ol style="font-size:0.85rem; color:#555; margin:0.4rem 0 0 1.2rem;">${p.pasos.map(s => `<li>${escAv(s)}</li>`).join("")}</ol></details>` : ""}
+                ${p.explicacion ? `<p style="font-size:0.83rem; color:#666; font-style:italic; margin-top:0.4rem;">${escAv(p.explicacion)}</p>` : ""}`;
+        };
 
         async function fetchSimulacroLeaderboard(simId, myEmail) {
             const result = { rows: [], rank: 0 };
@@ -1146,6 +1430,11 @@
                         <p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Tu respuesta:</strong> ${selectedText}</p>
                         ${!d.isCorrect ? `<p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Respuesta correcta:</strong> ${correctText}</p>` : ''}
                         ${d.explicacion ? `<p style="color:#666;font-size:0.85rem;margin-top:0.5rem;font-style:italic;">${d.explicacion}</p>` : ''}
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.7rem;">
+                            <button class="filter-btn" style="font-size:0.78rem; padding:0.3rem 0.8rem;" onclick="tutorEstudiar(window._ultimoResultado.state.details[${i}].texto, 'pista')">💡 Pedir pista al tutor</button>
+                            <button class="filter-btn" style="font-size:0.78rem; padding:0.3rem 0.8rem;" onclick="abrirClonResultado(${i})">🌀 Clonar problema</button>
+                        </div>
+                        <div id="clon-box-r-${i}"></div>
                     </div>`;
             });
             solucionario += '</div>';
@@ -1175,6 +1464,7 @@
                     ${lb && lb.rank > 0 ? `<p style="font-size:1.2rem;font-weight:bold;color:#1a1a2e;margin:1rem 0;">🏆 Tu puesto: N° ${lb.rank} de ${lb.rows.length}</p>` : ''}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>
                     ${breakdown}
+                    ${buildEstrategiaHTML(state.estrategia)}
                     ${leaderboardHtml}
                     <div id="guia-box" style="margin:2rem auto; max-width:800px; background:#f0faf7; border:1px solid #00c89655; border-radius:12px; padding:1.5rem; text-align:center;">
                         <h3 style="color:#1a1a2e; margin-bottom:0.4rem;">📖 Tu guía de aprendizaje personalizada</h3>
@@ -1280,10 +1570,12 @@
 
             const email = await resolveStudentEmail();
             let state = null;
+            let estrategiaCache = null;
             try {
                 const cached = JSON.parse(localStorage.getItem("area52_res_" + item.id) || "null");
                 if (cached && cached.answers) {
                     state = computeSimulacroResults(item, cached.answers, cached.elapsed || 0);
+                    estrategiaCache = cached.estrategia || null;
                 }
             } catch (e) {}
 
@@ -1298,6 +1590,11 @@
                         state = computeSimulacroResults(item, sub.respuestas, sub.tiempo_segundos || 0);
                     }
                 } catch (e) {}
+            }
+
+            if (state) {
+                // Sin tiempos de ataque disponibles: auditoría básica (penalización + blancos)
+                state.estrategia = estrategiaCache || analizarEstrategia(item, state.details.reduce((a, d, i) => { if (d.selected !== undefined && d.selected !== null) a[i] = d.selected; return a; }, {}), null, state.elapsed || 0);
             }
 
             if (!state) {
@@ -1332,6 +1629,7 @@
             document.getElementById("simulacro-topbar").style.display = "none";
             const elapsed = simulacroStartTime ? Math.floor((Date.now() - simulacroStartTime.getTime()) / 1000) : 0;
             const state = computeSimulacroResults(simulacroCurrentTest, window.simulacroAnswers, elapsed);
+            state.estrategia = analizarEstrategia(simulacroCurrentTest, window.simulacroAnswers, simulacroTiempos, elapsed);
             const email = await resolveStudentEmail();
             const nombre = window._studentNombre || "Sin nombre";
             const whatsapp = window._studentWhatsapp || "";
@@ -1355,7 +1653,7 @@
                 fecha_fin: new Date().toISOString()
             };
             try {
-                localStorage.setItem("area52_res_" + (simulacroCurrentTest.id || "adhoc"), JSON.stringify({ answers: window.simulacroAnswers, elapsed: elapsed }));
+                localStorage.setItem("area52_res_" + (simulacroCurrentTest.id || "adhoc"), JSON.stringify({ answers: window.simulacroAnswers, elapsed: elapsed, estrategia: state.estrategia || null }));
             } catch (e) {}
 
             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1380,6 +1678,23 @@
                         respuestas: window.simulacroAnswers
                     })
                 }).catch(() => {});
+            } catch (e) {}
+
+            // Auditoría de estrategia (guardado best-effort: si la tabla
+            // aún no existe, se ignora sin bloquear el resultado)
+            try {
+                if (state.estrategia) {
+                    const { error: errEst } = await supabase.from("estrategia_auditoria").insert({
+                        estudiante_email: email,
+                        simulacro_id: simulacroCurrentTest.id || null,
+                        universidad: window._selectedUni || "UNI",
+                        nota: Math.round(state.nota * 100) / 100,
+                        nota_sin_penalizacion: Math.round((state.estrategia.notaSinPenalizacion || state.nota) * 100) / 100,
+                        hallazgos: (state.estrategia.hallazgos || []).map(h => h.replace(/<[^>]+>/g, "")),
+                        escenarios: state.estrategia.escenarios || [],
+                        orden_ataque: state.estrategia.orden_ataque || []
+                    });
+                }
             } catch (e) {}
 
             // Si el examen programado aun no termina, ocultar nota, orden de merito y solucionario
@@ -1471,7 +1786,10 @@
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
                         <button class="filter-btn" onclick="toggleRepasada('${e.vista_id}')">${rep ? "Marcar sin repasar" : "Marcar repasada"}</button>
                         <button class="filter-btn" onclick="tutorEstudiar(window._erroresVisibles[${ei}].texto, 'errores')">🤖 Que el tutor me lo explique</button>
+                        <button class="filter-btn" onclick="tutorEstudiar(window._erroresVisibles[${ei}].texto, 'pista')">💡 Dame una pista</button>
+                        <button class="filter-btn" onclick="abrirClonError(${ei})">🌀 Clonar problema</button>
                     </div>
+                    <div id="clon-box-e-${ei}"></div>
                 </div>`;
             }).join("");
         }
@@ -1484,11 +1802,12 @@
             const box1 = document.getElementById("avance-countdown");
             const box2 = document.getElementById("avance-resumen");
             const boxPlan = document.getElementById("avance-plan");
+            const boxPS = document.getElementById("avance-plan-semanal");
             const box3 = document.getElementById("avance-evolucion");
             const box4 = document.getElementById("avance-areas");
             const box5 = document.getElementById("avance-guias");
             if (!email || email === "anonimo") {
-                [box0, box1, box2, boxPlan, box3, box4, box5].forEach(b => { if (b) b.innerHTML = ""; });
+                [box0, box1, box2, boxPlan, boxPS, box3, box4, box5].forEach(b => { if (b) b.innerHTML = ""; });
                 document.getElementById("avance-errores").innerHTML = '<div class="content-card"><p style="text-align:center; color:#888;">Inicia sesión para ver tu avance.</p></div>';
                 return;
             }
@@ -1594,7 +1913,7 @@
 
             if (!subs.length) {
                 box2.innerHTML = `<div class="content-card" style="text-align:center;"><p style="color:#666;">Aún no tienes simulacros registrados. Rinde el primero y aquí verás tu evolución, tu nivel por área y tu plan diario.</p></div>`;
-                boxPlan.innerHTML = ""; box3.innerHTML = ""; box4.innerHTML = "";
+                boxPlan.innerHTML = ""; boxPS.innerHTML = ""; box3.innerHTML = ""; box4.innerHTML = "";
             } else {
                 const notas = subs.map(s => Number(s.nota || 0));
                 const mejor = Math.max(...notas);
@@ -1634,6 +1953,23 @@
                         <span>${escAv(p.t)} <button class="filter-btn" style="margin-left:0.5rem; padding:0.25rem 0.8rem; font-size:0.78rem;" onclick="${p.fn}">${p.btn}</button></span>
                         <span style="color:#888; font-size:0.85rem; white-space:nowrap;">${p.min}</span></div>`).join("") + `</div>`;
 
+                // --- Plan semanal IA (lunes → domingo): diagnóstico de brechas ---
+                const errCnt = {};
+                vistasErr.forEach(v => {
+                    const b = bancoMap[v.pregunta_id];
+                    const s = b && (b.subtema || b.area);
+                    if (s) errCnt[s] = (errCnt[s] || 0) + 1;
+                });
+                window._planDatos = {
+                    email, uni, nombre,
+                    debiles: debiles.map(d => ({ area: d.area, pct: d.pct })),
+                    erroresTop: Object.entries(errCnt).sort((a, b) => b[1] - a[1]).slice(0, 6).map(x => x[0]),
+                    diasFaltan: diasFaltan === "[N]" ? null : Number(diasFaltan),
+                    fechaExamen: (proximo && proximo.fecha_inicio) ? new Date(proximo.fecha_inicio).toISOString().slice(0, 10) : "",
+                    racha, sesiones: sesionesSemana
+                };
+                renderPlanSemanal(boxPS);
+
                 const ultimos = [...subs].reverse().slice(-10);
                 box3.innerHTML = `<div class="content-card"><h3>📈 Tu evolución (nota /20)</h3>` +
                     ultimos.map(s => {
@@ -1669,19 +2005,101 @@
             renderErrores(errores);
         }
 
+        // === PLAN SEMANAL IA (lunes → domingo) ===
+        function lunesISO() {
+            const d = new Date();
+            const off = (d.getDay() + 6) % 7;
+            d.setDate(d.getDate() - off);
+            return d.toISOString().slice(0, 10);
+        }
+        function renderPlanSemanal(box) {
+            if (!box) return;
+            const P = window._planDatos;
+            if (!P) { box.innerHTML = ""; return; }
+            const key = "area52_plan_" + P.uni + "_" + lunesISO();
+            let cache = null;
+            try { cache = JSON.parse(localStorage.getItem(key) || "null"); } catch {}
+            if (cache && cache.plan_markdown) { pintarPlanSemanal(box, cache); return; }
+            box.innerHTML = `<div class="content-card" style="border-left:4px solid #8e7cc3;">
+                <h3>📅 Mi plan semanal <span style="color:#8e7cc3;">· con IA</span></h3>
+                <p style="color:#666; font-size:0.9rem; margin:0.3rem 0 0.8rem;">De lunes a domingo: prioriza tus áreas débiles, tus errores más frecuentes y los días que faltan para tu examen, con repaso espaciado.</p>
+                <button class="btn btn-primary" onclick="generarPlanSemanal()" style="background:#8e7cc3; border-color:#8e7cc3;">📅 Generar mi plan de la semana</button>
+                <div id="plan-semanal-out"></div>
+            </div>`;
+        }
+        window.generarPlanSemanal = async function(force) {
+            const P = window._planDatos;
+            const box = document.getElementById("avance-plan-semanal");
+            if (!P || !box) return;
+            const key = "area52_plan_" + P.uni + "_" + lunesISO();
+            if (!force) {
+                try {
+                    const c = JSON.parse(localStorage.getItem(key) || "null");
+                    if (c && c.plan_markdown) { pintarPlanSemanal(box, c); return; }
+                } catch {}
+            }
+            box.innerHTML = `<div class="content-card" style="border-left:4px solid #8e7cc3;">
+                <h3>📅 Mi plan semanal</h3>
+                <p style="color:#8e7cc3;">🤖 La IA está cruzando tu nivel por área, tus errores y la fecha de tu examen...</p></div>`;
+            try {
+                const res = await fetch("/api/weekly-plan", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        estudiante_email: P.email, nombre: P.nombre, universidad: P.uni,
+                        areas: P.debiles, errores_top: P.erroresTop,
+                        dias_faltan: P.diasFaltan, fecha_examen: P.fechaExamen,
+                        racha: P.racha, sesiones_semana: P.sesiones
+                    })
+                });
+                const d = await res.json();
+                if (!res.ok || !d.plan_markdown) throw new Error(d.error || "Error de la IA");
+                try { localStorage.setItem(key, JSON.stringify(d)); } catch {}
+                pintarPlanSemanal(box, d);
+            } catch (e) {
+                box.innerHTML = `<div class="content-card" style="border-left:4px solid #e74c3c;">
+                    <p style="color:#e74c3c;">No pude generar el plan: ${escAv(e.message)}.</p>
+                    <button class="filter-btn" onclick="generarPlanSemanal(true)" style="margin-top:0.5rem;">Reintentar</button></div>`;
+            }
+        };
+        function pintarPlanSemanal(box, d) {
+            const fecha = d.semana_inicio ? new Date(d.semana_inicio + "T12:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "long" }) : "";
+            box.innerHTML = `<div class="content-card" style="border-left:4px solid #8e7cc3;">
+                <h3>📅 Mi plan semanal ${fecha ? `<span style="font-size:0.8rem; color:#888; font-weight:normal;">· semana del ${fecha}</span>` : ""}</h3>
+                <div style="line-height:1.75; color:#333; margin-top:0.5rem;">${miniMd(d.plan_markdown)}</div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.8rem;">
+                    <button class="filter-btn" onclick="generarPlanSemanal(true)">🔄 Regenerar con mis datos actuales</button>
+                    <span class="badge-tag green">✅ Guardado · tu profesor lo ve en Admin</span>
+                </div>
+            </div>`;
+        }
+
         // === TUTOR ADAPTATIVO ===
         window._tutorModo = "explicar";
         window._tutorTema = "";
         window._tutorHist = [];
         window._tutorSaludado = false;
+        window._tutorPistaN = 0; // pista escalonada: 1 conceptual → 2 procedimiento → 3 desarrollo
 
         function tutorUni() { return window._selectedUni || "UNI"; }
         function tutorKey() { return "area52_tutor_" + tutorUni(); }
 
         window.tutorSetModo = function(modo, btn) {
             window._tutorModo = modo;
+            if (modo !== "pista") window._tutorPistaN = 0;
             document.querySelectorAll("#tutor-modos .filter-btn").forEach(b => b.classList.remove("active"));
             if (btn) btn.classList.add("active");
+            const linea = document.getElementById("tutor-pista-line");
+            if (linea) linea.style.display = modo === "pista" ? "block" : "none";
+        };
+        // Cada clic sube de nivel: pista 1 (concepto) → 2 (procedimiento) → 3 (desarrollo)
+        window.tutorPista = function(btn) {
+            const eraPista = window._tutorModo === "pista";
+            window.tutorSetModo("pista", btn);
+            window._tutorPistaN = eraPista ? (window._tutorPistaN % 3) + 1 : 1;
+            const nivelEl = document.getElementById("tutor-pista-nivel");
+            if (nivelEl) nivelEl.textContent = window._tutorPistaN;
+            const q = window._tutorTema ? ` Problema/tema: ${window._tutorTema}` : " (el último problema que trabajamos)";
+            tutorEnviar(`Necesito una pista, sin que me des la respuesta todavía. Pista ${window._tutorPistaN} de 3.${q}`);
         };
         window.tutorClearTema = function() {
             window._tutorTema = "";
@@ -1729,8 +2147,15 @@
                 explicar: `Explícame el tema: ${window._tutorTema}`,
                 practicar: `Quiero practicar: ${window._tutorTema}. Dame el primer ejercicio.`,
                 socratico: `Ayúdame a descubrir por mí mismo: ${window._tutorTema}`,
-                errores: window._tutorTema ? `Fallo mucho en: ${window._tutorTema}. Re-enséñamelo con ejemplos nuevos.` : `Quiero repasar mis errores del último simulacro. Empieza por el más frecuente.`
+                errores: window._tutorTema ? `Fallo mucho en: ${window._tutorTema}. Re-enséñamelo con ejemplos nuevos.` : `Quiero repasar mis errores del último simulacro. Empieza por el más frecuente.`,
+                pista: `Estoy atascado en este problema y necesito ayuda sin que me des la respuesta directa. Pista 1 de 3 (solo la conceptual). Problema/tema: ${window._tutorTema || "(el último que trabajamos)"}`,
+                corregir: `Quiero que corrijas mi procedimiento paso a paso (línea por línea). Prepárate: lo pego en mi siguiente mensaje. Tema: ${window._tutorTema || "(aún no lo digo)"}`
             };
+            if (window._tutorModo === "pista") {
+                window._tutorPistaN = 1;
+                const nivelEl = document.getElementById("tutor-pista-nivel");
+                if (nivelEl) nivelEl.textContent = "1";
+            }
             tutorEnviar(prompts[window._tutorModo] || prompts.explicar);
         };
         window.tutorEnviar = async function(textoForzado) {
@@ -1754,6 +2179,7 @@
                         nombre: window._studentNombre || "Estudiante",
                         universidad: tutorUni(),
                         modo: window._tutorModo,
+                        ...(window._tutorModo === "pista" ? { pista_n: window._tutorPistaN || 1 } : {}),
                         tema: window._tutorTema,
                         mensaje: texto,
                         historial: window._tutorHist.slice(-10)
