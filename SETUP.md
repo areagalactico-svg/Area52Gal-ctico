@@ -17,7 +17,7 @@ npm install
 ```bash
 npm run dev
 ```
-Abre http://localhost:3000
+Abre http://localhost:3000. Este servidor local sirve tanto la carpeta `public/` como los endpoints `/api/*` necesarios para simulacros y otros módulos de IA.
 
 ## Deployment en Vercel
 

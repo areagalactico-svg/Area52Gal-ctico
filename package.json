@@ -4,9 +4,9 @@
   "description": "Sitio web oficial de Área 52 UNI - Centro de Asesoría y Preparación Académica",
   "main": "index.js",
   "scripts": {
-    "dev": "http-server public -p 3000 -c-1",
+    "dev": "node server.js",
     "build": "echo 'Build complete'",
-    "start": "http-server public -p 5000",
+    "start": "node server.js",
     "deploy": "vercel",
     "agents:collect": "node agents/run-collect.js --uni=ALL",
     "agents:collect:uni": "node agents/run-collect.js --uni=UNI --save",
