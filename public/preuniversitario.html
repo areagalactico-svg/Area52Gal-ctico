@@ -1441,7 +1441,35 @@
             return solucionario;
         }
 
-        function buildResultsPageHTML(state, lb, myEmail) {
+        // === Interruptor global: ocultar notas (lo controla el Admin) ===
+        // Cachea el estado por 60s para no golpear Supabase en cada render.
+        async function notasOcultas() {
+            const ahora = Date.now();
+            if (window._notasOcultasCache && ahora - window._notasOcultasCache.t < 60000) return window._notasOcultasCache.v;
+            let v = false;
+            try {
+                const r = await supabase.from("config_plataforma").select("valor").eq("clave", "notas_ocultas").maybeSingle();
+                v = !!(r.data && (r.data.valor === "true" || r.data.valor === true));
+            } catch {}
+            window._notasOcultasCache = { v, t: ahora };
+            return v;
+        }
+
+        function renderNotasOcultas() {
+            return `
+                <div class="simulacro-result">
+                    <div style="font-size:3rem;">✅</div>
+                    <h2 style="color:#00c896;">Simulacro enviado correctamente</h2>
+                    <div style="background:#f6f2ff;border:1px solid #d9ccf0;border-radius:12px;padding:1.5rem;margin:1.5rem 0;text-align:left;max-width:560px;margin-left:auto;margin-right:auto;">
+                        <p style="font-weight:bold;color:#1a1a2e;margin-bottom:0.4rem;">🔒 Tus notas todavía no son públicas</p>
+                        <p style="color:#555;">Tu profesor está preparando la publicación de notas, el orden de mérito y los solucionarios. Aquí aparecerán automáticamente en cuanto active su publicación.</p>
+                    </div>
+                    <button class="btn" onclick="location.reload()" style="border-color:#ff6b6b;color:#ff6b6b;">Volver</button>
+                </div>`;
+        }
+
+        function buildResultsPageHTML(state, lb, myEmail, ocultasNotas) {
+            if (ocultasNotas) return renderNotasOcultas();
             const { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed } = state;
             const elapsedMin = Math.floor(elapsed / 60);
             const porPreg = total ? elapsed / total : 0;

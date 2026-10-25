@@ -269,16 +269,79 @@ async function cargarIngresoAdmin() {
   });
 }
 
+/* ---------- INTERRUPTOR GLOBAL: OCULTAR NOTAS A ESTUDIANTES ---------- */
+
+function pintarBtnNotas(btn, ocultas) {
+  btn.textContent = ocultas ? "🔒 Notas OCULTAS para estudiantes" : "🔓 Notas visibles";
+  btn.style.background = ocultas ? "#8e7cc3" : "transparent";
+  btn.style.color = ocultas ? "white" : "#8e7cc3";
+  btn.dataset.ocultas = ocultas ? "1" : "0";
+}
+
+async function cargarEstadoNotas() {
+  const btn = document.getElementById("res-toggle-notas");
+  const msg = document.getElementById("res-toggle-msg");
+  if (!btn) return;
+  try {
+    const { data, error } = await supabase.from("config_plataforma").select("valor").eq("clave", "notas_ocultas").maybeSingle();
+    if (error) throw error;
+    btn.style.display = "inline-block";
+    const ocultas = !!data && data.valor === "true";
+    pintarBtnNotas(btn, ocultas);
+    if (msg) {
+      msg.textContent = ocultas ? "🔒 Los estudiantes NO ven notas hasta que actives el interruptor." : "";
+      msg.style.color = "#8e7cc3";
+    }
+  } catch {
+    btn.style.display = "none";
+    if (msg) {
+      msg.innerHTML = '⚠️ Ejecuta <code>supabase-config-notas.sql</code> en Supabase para activar el interruptor de notas.';
+      msg.style.color = "#e67e22";
+    }
+  }
+}
+
+async function toggleNotas() {
+  const btn = document.getElementById("res-toggle-notas");
+  const msg = document.getElementById("res-toggle-msg");
+  if (!btn) return;
+  const ocultas = btn.dataset.ocultas !== "1";
+  btn.disabled = true;
+  try {
+    const { error } = await supabase.from("config_plataforma").upsert(
+      { clave: "notas_ocultas", valor: ocultas ? "true" : "false", updated_at: new Date().toISOString() },
+      { onConflict: "clave" }
+    );
+    if (error) throw new Error(error.message);
+    pintarBtnNotas(btn, ocultas);
+    window._notasOcultasCache = null; // invalida caché local si la hubiera
+    if (msg) {
+      msg.textContent = ocultas
+        ? "🔒 Notas ocultas: los estudiantes no ven nota, mérito, solucionario, estrategia ni avance (se aplica en ~1 min)."
+        : "🔓 Notas visibles otra vez: los estudiantes ya pueden ver sus notas (se aplica en ~1 min).";
+      msg.style.color = ocultas ? "#8e7cc3" : "#00a37a";
+    }
+  } catch (e) {
+    if (msg) {
+      msg.textContent = "Error: " + e.message + " — ¿corriste supabase-config-notas.sql en Supabase?";
+      msg.style.color = "#e74c3c";
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ---------- INIT ---------- */
 document.getElementById("res-simulacro")?.addEventListener("change", cargarResultados);
 document.getElementById("res-buscar")?.addEventListener("input", () => clearTimeout(window.__resT) || (window.__resT = setTimeout(cargarResultados, 300)));
 document.getElementById("res-exportar")?.addEventListener("click", exportarCSV);
+document.getElementById("res-toggle-notas")?.addEventListener("click", toggleNotas);
 document.getElementById("ag-run")?.addEventListener("click", correrAgentes);
 
 // Polling suave: refresca resultados cuando se abre la pestaña
 document.querySelectorAll('.tab-btn[data-tab="resultados"]').forEach((b) => b.addEventListener("click", async () => {
   if (!RES_SIMULACROS.length) await cargarSimulacrosParaFiltro();
-  cargarResultados(); cargarGuias();
+  cargarResultados(); cargarGuias(); cargarEstadoNotas();
 }));
 document.querySelectorAll('.tab-btn[data-tab="agentes"]').forEach((b) => b.addEventListener("click", () => { cargarGuias(); cargarBancoStats(); }));
 document.querySelectorAll('.tab-btn[data-tab="ingreso"]').forEach((b) => b.addEventListener("click", cargarIngresoAdmin));

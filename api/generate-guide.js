@@ -54,7 +54,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: "Falta resultado.nota (envía el resultado del simulacro)" });
   }
 
-  const API_KEY = process.env.DEEPSEEK_API_KEY;
+  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
+  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
   if (!API_KEY) return res.status(500).json({ error: "API key not configured" });
 
   // 1) Contexto real: materiales de SU universidad en Supabase
@@ -102,11 +104,16 @@ Devuelve JSON VÁLIDO (sin markdown, sin backticks) con esta forma exacta:
 }`;
 
   try {
-    const r = await fetch("https://api.deepseek.com/chat/completions", {
+    const r = await fetch(AI_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
+        "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
+      },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

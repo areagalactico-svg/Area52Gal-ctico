@@ -42,5 +42,5 @@ http://localhost:3000
 
 - **Frontend**: HTML/CSS/JS vanilla
 - **Backend**: Supabase (PostgreSQL + Auth + Storage)
-- **IA**: DeepSeek API (generación de preguntas)
+- **IA**: OpenRouter API (generación de preguntas, tutor, guías y chatbot)
 - **Hosting**: Vercel

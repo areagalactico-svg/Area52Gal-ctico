@@ -35,9 +35,10 @@ vercel
 
 ## Variables de Entorno en Vercel
 
-Solo necesitas una:
+Configura tu API key de OpenRouter (y opcionalmente el modelo):
 ```
-DEEPSEEK_API_KEY=tu_api_key_del_chatbot
+OPENROUTER_API_KEY=tu_api_key_de_openrouter
+OPENROUTER_MODEL=deepseek/deepseek-chat
 ```
 
 Las credenciales de Supabase están en `public/js/supabase-config.js`.

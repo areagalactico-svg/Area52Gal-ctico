@@ -202,16 +202,23 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
   const exclusion = exclusionStems.length
     ? `\n\nPREGUNTAS PROHIBIDAS (ya existen en el banco o el estudiante ya las vio — NO generes ninguna igual ni reescrita con otras palabras):\n${exclusionStems.map((s) => `- ${s}`).join("\n")}`
     : "";
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
+  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
+  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
+  const response = await fetch(AI_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
+      "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
+    },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: AI_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Genera las ${n} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? "IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas." : ""}${exclusion}` },
       ],
-      max_tokens: 32768,
+      max_tokens: 8192,
       temperature: 0.9,
     }),
   });
@@ -279,7 +286,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: "Topic and type are required" });
   }
 
-  const API_KEY = process.env.DEEPSEEK_API_KEY;
+  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
 
   if (!API_KEY) {
     return res.status(500).json({ error: "API key not configured" });

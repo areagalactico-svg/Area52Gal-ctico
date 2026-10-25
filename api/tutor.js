@@ -148,7 +148,9 @@ module.exports = async function handler(req, res) {
   const { mensaje, historial } = body;
   if (!mensaje || !String(mensaje).trim()) return res.status(400).json({ error: "Falta mensaje" });
 
-  const API_KEY = process.env.DEEPSEEK_API_KEY;
+  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
+  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
   if (!API_KEY) return res.status(500).json({ error: "API key not configured" });
 
   const email = (body.estudiante_email || "").trim() || "anonimo";
@@ -190,11 +192,16 @@ REGLAS:
 - Si el tema no es del examen de ${universidad}, avísalo en 1 línea y redirige a lo que sí evalúan.`;
 
   try {
-    const r = await fetch("https://api.deepseek.com/chat/completions", {
+    const r = await fetch(AI_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
+        "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
+      },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           ...((historial || []).slice(-10).filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)),
