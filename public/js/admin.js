@@ -811,27 +811,23 @@ window.generateSimulacroQuestions = async function(simulacroId) {
     } catch(e) {}
 
     const bloques = [
-      { seccion: "razonamiento_matematico", cantidad: 6 },
-      { seccion: "razonamiento_matematico", cantidad: 6 },
-      { seccion: "razonamiento_verbal", cantidad: 7 },
-      { seccion: "razonamiento_verbal", cantidad: 6 },
-      { seccion: "humanidades_pe1", cantidad: 5 },
-      { seccion: "humanidades_pe1", cantidad: 5 },
-      { seccion: "matematica", cantidad: 5 },
-      { seccion: "matematica", cantidad: 5 },
+      { seccion: "razonamiento_matematico", cantidad: 12 },
+      { seccion: "razonamiento_verbal", cantidad: 13 },
+      { seccion: "humanidades_pe1", cantidad: 10 },
+      { seccion: "matematica", cantidad: 10 },
       { seccion: "fisica", cantidad: 7 },
       { seccion: "quimica", cantidad: 7 },
       { seccion: "humanidades_pe3", cantidad: 6 }
     ];
     const preguntas = [];
     const exclusiones = (simulacro.preguntas || []).map(q => q.texto);
+    let bloquesCompletados = 0;
 
-    for (let i = 0; i < bloques.length; i++) {
-      const bloque = bloques[i];
+    const generarBloque = async (bloque, indice) => {
       const preguntasBloque = [];
       for (let intento = 0; intento < 2 && preguntasBloque.length < bloque.cantidad; intento++) {
         const faltan = bloque.cantidad - preguntasBloque.length;
-        btn.textContent = `Generando ${i + 1}/${bloques.length}${intento ? " (reintento)" : ""}...`;
+        btn.textContent = `Generando ${bloquesCompletados}/${bloques.length} bloques...`;
         const res = await fetch("/api/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -842,7 +838,7 @@ window.generateSimulacroQuestions = async function(simulacroId) {
             batch_section: bloque.seccion,
             context: context,
             universidad: simulacro.universidad || "UNI",
-            exclude_textos: exclusiones.concat(preguntas, preguntasBloque).map(q => typeof q === "string" ? q : q.texto)
+            exclude_textos: exclusiones.concat(preguntas).map(q => typeof q === "string" ? q : q.texto)
           })
         });
 
@@ -858,14 +854,26 @@ window.generateSimulacroQuestions = async function(simulacroId) {
           throw new Error(data.error || `Error del servidor (HTTP ${res.status})`);
         }
         if (!Array.isArray(data.preguntas) || !data.preguntas.length) {
-          throw new Error(`No se pudieron generar preguntas para el bloque ${i + 1}.`);
+          throw new Error(`No se pudieron generar preguntas para el bloque ${indice + 1}.`);
         }
         preguntasBloque.push(...data.preguntas.slice(0, faltan));
       }
       if (preguntasBloque.length !== bloque.cantidad) {
-        throw new Error(`El bloque ${i + 1} devolvió ${preguntasBloque.length} de ${bloque.cantidad} preguntas.`);
+        throw new Error(`El bloque ${indice + 1} devolvió ${preguntasBloque.length} de ${bloque.cantidad} preguntas.`);
       }
-      preguntas.push(...preguntasBloque);
+      bloquesCompletados++;
+      btn.textContent = `Generando ${bloquesCompletados}/${bloques.length} bloques...`;
+      return preguntasBloque;
+    };
+
+    for (let i = 0; i < bloques.length; i += 3) {
+      const grupo = bloques.slice(i, i + 3);
+      const resultados = await Promise.allSettled(
+        grupo.map((bloque, indice) => generarBloque(bloque, i + indice))
+      );
+      const fallo = resultados.find(resultado => resultado.status === "rejected");
+      if (fallo) throw fallo.reason;
+      resultados.forEach(resultado => preguntas.push(...resultado.value));
     }
 
     if (preguntas.length === 65) {
