@@ -759,7 +759,6 @@ window.generateSimulacroQuestions = async function(simulacroId) {
 
   const btn = event.target;
   btn.disabled = true;
-  btn.textContent = "Generando...";
 
   try {
     const { data: simulacro, error: fetchError } = await supabase
@@ -811,26 +810,69 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       }
     } catch(e) {}
 
-    const res = await fetch("/api/generate-questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic: "Examen Completo IEN",
-        type: "simulacro",
-        count: 65,
-        context: context,
-        universidad: simulacro.universidad || "UNI",
-        exclude_textos: (simulacro.preguntas || []).map(q => q.texto)
-      })
-    });
+    const bloques = [
+      { seccion: "razonamiento_matematico", cantidad: 6 },
+      { seccion: "razonamiento_matematico", cantidad: 6 },
+      { seccion: "razonamiento_verbal", cantidad: 7 },
+      { seccion: "razonamiento_verbal", cantidad: 6 },
+      { seccion: "humanidades_pe1", cantidad: 5 },
+      { seccion: "humanidades_pe1", cantidad: 5 },
+      { seccion: "matematica", cantidad: 5 },
+      { seccion: "matematica", cantidad: 5 },
+      { seccion: "fisica", cantidad: 7 },
+      { seccion: "quimica", cantidad: 7 },
+      { seccion: "humanidades_pe3", cantidad: 6 }
+    ];
+    const preguntas = [];
+    const exclusiones = (simulacro.preguntas || []).map(q => q.texto);
 
-    const data = await res.json();
+    for (let i = 0; i < bloques.length; i++) {
+      const bloque = bloques[i];
+      const preguntasBloque = [];
+      for (let intento = 0; intento < 2 && preguntasBloque.length < bloque.cantidad; intento++) {
+        const faltan = bloque.cantidad - preguntasBloque.length;
+        btn.textContent = `Generando ${i + 1}/${bloques.length}${intento ? " (reintento)" : ""}...`;
+        const res = await fetch("/api/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: "Examen Completo IEN",
+            type: "simulacro",
+            count: faltan,
+            batch_section: bloque.seccion,
+            context: context,
+            universidad: simulacro.universidad || "UNI",
+            exclude_textos: exclusiones.concat(preguntas, preguntasBloque).map(q => typeof q === "string" ? q : q.texto)
+          })
+        });
 
-    if (res.ok && data.preguntas && data.preguntas.length > 0) {
+        const responseText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          const detalle = responseText.trim().slice(0, 180);
+          throw new Error(`El servidor respondió HTTP ${res.status} sin JSON${detalle ? `: ${detalle}` : ""}`);
+        }
+        if (!res.ok) {
+          throw new Error(data.error || `Error del servidor (HTTP ${res.status})`);
+        }
+        if (!Array.isArray(data.preguntas) || !data.preguntas.length) {
+          throw new Error(`No se pudieron generar preguntas para el bloque ${i + 1}.`);
+        }
+        preguntasBloque.push(...data.preguntas.slice(0, faltan));
+      }
+      if (preguntasBloque.length !== bloque.cantidad) {
+        throw new Error(`El bloque ${i + 1} devolvió ${preguntasBloque.length} de ${bloque.cantidad} preguntas.`);
+      }
+      preguntas.push(...preguntasBloque);
+    }
+
+    if (preguntas.length === 65) {
       const { error: updateError } = await supabase
         .from("simulacros_ien")
         .update({
-          preguntas: data.preguntas,
+          preguntas: preguntas,
           duracion: 180
         })
         .eq("id", simulacroId);
@@ -838,16 +880,14 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       if (updateError) {
         alert("Error al guardar las preguntas: " + updateError.message);
       } else {
-        const extra = data.repetidas_filtradas ? ` (${data.repetidas_filtradas} repetidas filtradas automáticamente)` : "";
-        const nivelTxt = data.nivel ? ` · Nivel: ${data.nivel.pct_altas}% altas (${data.nivel.altas}/${data.preguntas.length})` : "";
-        alert(`Se generaron ${data.preguntas.length} preguntas nuevas sin repetición${extra}${nivelTxt}!`);
+        alert(`Se generaron ${preguntas.length} preguntas nuevas sin repetición!`);
         loadAllData();
       }
     } else {
-      alert("La IA no pudo generar las preguntas. Intenta de nuevo.");
+      throw new Error(`Se generaron ${preguntas.length} de las 65 preguntas solicitadas.`);
     }
   } catch (err) {
-    alert("Error de conexion: " + err.message);
+    alert("No se pudo generar el simulacro: " + err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = "Generar preguntas IA";

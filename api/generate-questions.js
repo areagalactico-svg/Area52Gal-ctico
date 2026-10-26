@@ -18,6 +18,15 @@ const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_KEY || null;
 
 const UMBRAL_SIMILITUD = 0.85;
 const MAX_INTENTOS = 2;
+const BATCH_SECTION_PROMPTS = {
+  razonamiento_matematico: "Razonamiento Matemático de Aptitud Académica (PE1): sucesiones no obvias, análisis de figuras, conteo, lógica y juegos lógicos.",
+  razonamiento_verbal: "Razonamiento Verbal de Aptitud Académica (PE1): comprensión lectora con textos densos e inferencia, analogías de segundo orden, semántica y ortografía.",
+  humanidades_pe1: "Humanidades de Aptitud Académica (PE1): Comunicación, Literatura, Historia, Geografía, Economía, Filosofía y Ambiente; prioriza relaciones de causa y efecto.",
+  matematica: "Matemática de Conocimientos (PE2): Aritmética, Álgebra, Geometría y Trigonometría, combinando conceptos y evitando aplicación directa de una sola fórmula.",
+  fisica: "Física de Conocimientos (PE2): Cinemática, dinámica, trabajo y energía, estática, hidrostática, termodinámica, electricidad, ondas y óptica; combina principios.",
+  quimica: "Química de Conocimientos (PE2): estructura atómica, enlaces, estequiometría y reacciones; incluye reactivo limitante o impurezas cuando corresponda.",
+  humanidades_pe3: "Humanidades y Cultura General de Conocimientos (PE3): Literatura, Historia, Geografía y Economía; prioriza preguntas relacionales, no fechas aisladas.",
+};
 
 // Normalización canónica (EL CLIENTE USA LA MISMA REGLA para vistas)
 function normalizarTexto(s) {
@@ -251,6 +260,10 @@ module.exports = async function handler(req, res) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const { topic, type, count, context } = body;
+  const batchSectionKey = typeof body.batch_section === "string" ? body.batch_section : "";
+  const batchSection = Object.prototype.hasOwnProperty.call(BATCH_SECTION_PROMPTS, batchSectionKey)
+    ? BATCH_SECTION_PROMPTS[batchSectionKey]
+    : null;
   const universidad = (body.universidad || "UNI").trim() || "UNI";
   // Acepta ambos nombres de parámetro (compatibilidad de clientes)
   const _excl = body.exclude_textos || body.exclude_texts || [];
@@ -284,6 +297,9 @@ module.exports = async function handler(req, res) {
 
   if (!topic || !type) {
     return res.status(400).json({ error: "Topic and type are required" });
+  }
+  if (batchSectionKey && (!batchSection || type !== "simulacro")) {
+    return res.status(400).json({ error: "Invalid simulacro batch section" });
   }
 
   const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
@@ -457,6 +473,18 @@ REGLAS:
 - Incluye preguntas de preferencia (¿qué prefieres hacer?)
 - Incluye preguntas de autoevaluación (¿qué tan hábil te consideras?)
 - Varía los frameworks para cubrir múltiples dimensiones de la personalidad`;
+  }
+
+  if (batchSection) {
+    config.count = numQuestions;
+    systemPrompt = `Eres un experto creador de exámenes de admisión IEN UNI. Genera EXACTAMENTE ${numQuestions} preguntas nuevas únicamente sobre esta sección: ${batchSection}
+
+Usa los materiales de referencia como guía de estilo y nivel. Cada pregunta debe tener cinco opciones (A-E), una respuesta correcta con índice de 0 a 4, dificultad "alta", al menos tres pasos de resolución y una explicación breve. Combina conceptos, evita preguntas de memoria o de aplicación directa, y asegúrate de que las opciones incorrectas sean distractores plausibles. El campo "area" debe ser PE1 para Aptitud Académica, PE2 para Matemática/Física/Química o PE3 para Humanidades de Conocimientos.
+
+${context ? `MATERIALES DE REFERENCIA:\n${context}\n\n` : ""}Responde únicamente con JSON válido, sin markdown:
+{"preguntas":[{"texto":"...","opciones":["A) ...","B) ...","C) ...","D) ...","E) ..."],"respuestaCorrecta":0,"area":"PE1/PE2/PE3","subtema":"...","dificultad":"alta","pasos":["...","...","..."],"explicacion":"..."}]}
+
+No generes preguntas de otras secciones.`;
   }
 
   try {
