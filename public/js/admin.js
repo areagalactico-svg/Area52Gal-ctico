@@ -938,7 +938,7 @@ window.viewSimulacroResults = async function(simulacroId) {
     let html = `
       <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
       <h3 style="color:#1a1a2e; margin:0;">${simulacro?.titulo || 'Simulacro'}</h3>
-      <button class="btn btn-primary" type="button" onclick="exportSimulacroResults()">⬇ Exportar a Excel (.csv)</button>
+      <button class="btn btn-primary" type="button" onclick="exportSimulacroResults()">⬇ Descargar reporte HTML</button>
       </div>
       <p style="color:#666; margin-bottom:1.5rem;">${submissions.length} estudiante(s) presentaron este examen</p>
       <div style="overflow-x: auto;">
@@ -1001,46 +1001,140 @@ window.exportSimulacroResults = function() {
     return;
   }
 
-  const escapeCsv = (value) => {
-    let text = String(value ?? "");
-    if (/^\s*[=+\-@]/.test(text)) text = `'${text}`;
-    return `"${text.replace(/"/g, '""')}"`;
-  };
-  const rows = [
-    ["Puesto", "Nombre", "WhatsApp", "Correo", "Nota /20", "Puntaje", "Correctas", "Porcentaje", "Tiempo (mm:ss)", "Fecha de entrega"]
-  ];
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+  const notaDe = (s) => s.nota != null ? Number(s.nota) : 0;
+  const promedio = currentSimulacroResults.reduce((sum, s) => sum + notaDe(s), 0) / currentSimulacroResults.length;
+  const aprobados = currentSimulacroResults.filter((s) => notaDe(s) >= 11).length;
+  const fechaGenerado = new Date().toLocaleDateString("es-PE", {
+    day: "2-digit", month: "long", year: "numeric"
+  });
+  const slug = currentSimulacroTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "simulacro";
 
-  currentSimulacroResults.forEach((s, index) => {
+  const filas = currentSimulacroResults.map((s, index) => {
     const correctCount = s.area_results
       ? Object.values(s.area_results).reduce((sum, area) => sum + (area.correct || 0), 0)
       : 0;
     const elapsed = Math.max(0, Number(s.tiempo_segundos) || 0);
     const mins = Math.floor(elapsed / 60);
     const secs = elapsed % 60;
-    rows.push([
-      index + 1,
-      s.nombre_completo || "Sin nombre",
-      s.whatsapp || "",
-      s.estudiante_email || "",
-      (s.nota != null ? Number(s.nota) : 0).toFixed(2).replace(".", ","),
-      (Number(s.puntaje) || 0).toFixed(2).replace(".", ","),
-      `${correctCount}/${currentSimulacroTotalPreguntas}`,
-      `${Number(s.porcentaje) || 0}%`,
-      `${mins}:${String(secs).padStart(2, "0")}`,
-      s.fecha_fin || ""
-    ]);
+    const fechaEntrega = s.fecha_fin && !Number.isNaN(Date.parse(s.fecha_fin))
+      ? new Date(s.fecha_fin).toLocaleString("es-PE", {
+        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+      })
+      : "—";
+    const puesto = index < 3 ? ["🥇", "🥈", "🥉"][index] : `${index + 1}`;
+    return `<tr>
+      <td class="rank">${puesto}</td>
+      <td class="student"><strong>${escapeHtml(s.nombre_completo || "Sin nombre")}</strong></td>
+      <td>${escapeHtml(s.whatsapp || "—")}</td>
+      <td class="email">${escapeHtml(s.estudiante_email || "—")}</td>
+      <td class="grade">${notaDe(s).toFixed(1)}<small> / 20</small></td>
+      <td>${(Number(s.puntaje) || 0).toFixed(2)}</td>
+      <td>${correctCount} / ${currentSimulacroTotalPreguntas}</td>
+      <td>${Number(s.porcentaje) || 0}%</td>
+      <td>${mins}:${String(secs).padStart(2, "0")}</td>
+      <td>${fechaEntrega}</td>
+    </tr>`;
   });
 
-  const csv = "\ufeffsep=;\r\n" + rows
-    .map((row) => row.map(escapeCsv).join(";"))
-    .join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const report = `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resultados — ${escapeHtml(currentSimulacroTitle)}</title>
+  <style>
+    :root { color-scheme: light; --navy:#17182d; --green:#009b77; --muted:#697386; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f3f5f8; color:#202638; font:14px/1.5 "Segoe UI",Arial,sans-serif; }
+    .page { max-width:1200px; margin:36px auto; padding:0 24px; }
+    .toolbar { display:flex; justify-content:flex-end; margin-bottom:14px; }
+    .print { border:0; border-radius:8px; padding:11px 18px; background:var(--green); color:#fff; font-weight:700; cursor:pointer; }
+    .header { padding:30px 34px; border-radius:14px 14px 0 0; background:var(--navy); color:#fff; }
+    .eyebrow { margin:0 0 7px; color:#7de0c2; font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; }
+    h1 { margin:0; font-size:28px; line-height:1.2; }
+    .subtitle { margin:10px 0 0; color:#c6cada; }
+    .content { padding:24px; border:1px solid #e6e9ef; border-top:0; border-radius:0 0 14px 14px; background:#fff; }
+    .stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:24px; }
+    .stat { padding:16px 18px; border:1px solid #e8ebf0; border-radius:10px; background:#fbfcfd; }
+    .stat span { display:block; color:var(--muted); font-size:12px; }
+    .stat strong { display:block; margin-top:3px; color:var(--navy); font-size:23px; }
+    .stat strong.green { color:var(--green); }
+    h2 { margin:0 0 12px; color:var(--navy); font-size:17px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    thead { background:var(--navy); color:white; }
+    th { padding:12px 10px; text-align:left; white-space:nowrap; }
+    td { padding:11px 10px; border-bottom:1px solid #edf0f3; vertical-align:middle; }
+    tbody tr:nth-child(even) { background:#f8fafb; }
+    tbody tr:nth-child(-n+3) { background:#fff9e9; }
+    .rank { width:52px; text-align:center; font-weight:700; }
+    .student { min-width:150px; }
+    .email { color:var(--muted); overflow-wrap:anywhere; }
+    .grade { color:var(--green); font-size:15px; font-weight:800; white-space:nowrap; }
+    .grade small { color:var(--muted); font-size:10px; font-weight:500; }
+    footer { margin-top:18px; color:var(--muted); font-size:11px; text-align:right; }
+    @media (max-width:700px) {
+      .page { margin:16px auto; padding:0 12px; }
+      .header { padding:23px 20px; }
+      .content { padding:16px; }
+      h1 { font-size:23px; }
+      .stats { grid-template-columns:1fr; gap:9px; }
+      .stat { padding:12px 15px; }
+      .stat strong { font-size:20px; }
+    }
+    @page { size:landscape; margin:12mm; }
+    @media print {
+      body { background:#fff; font-size:10px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+      .page { max-width:none; margin:0; padding:0; }
+      .toolbar { display:none; }
+      .header { padding:18px 22px; }
+      .content { padding:16px 0; border:0; }
+      .stats { grid-template-columns:repeat(3,1fr); margin-bottom:14px; }
+      .stat { padding:9px 12px; }
+      table { font-size:9px; }
+      th,td { padding:7px 6px; }
+      tr { break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="toolbar"><button class="print" onclick="window.print()">Imprimir / Guardar como PDF</button></div>
+    <header class="header">
+      <p class="eyebrow">Área 52 · Reporte de resultados</p>
+      <h1>${escapeHtml(currentSimulacroTitle)}</h1>
+      <p class="subtitle">Resultados de ${currentSimulacroResults.length} estudiante(s) · Generado el ${escapeHtml(fechaGenerado)}</p>
+    </header>
+    <section class="content">
+      <div class="stats">
+        <div class="stat"><span>Estudiantes</span><strong>${currentSimulacroResults.length}</strong></div>
+        <div class="stat"><span>Nota promedio</span><strong class="green">${promedio.toFixed(1)} <small>/ 20</small></strong></div>
+        <div class="stat"><span>Aprobados (nota ≥ 11)</span><strong>${aprobados} <small>/ ${currentSimulacroResults.length}</small></strong></div>
+      </div>
+      <h2>Notas y orden de mérito</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Puesto</th><th>Estudiante</th><th>WhatsApp</th><th>Correo</th>
+            <th>Nota</th><th>Puntaje</th><th>Correctas</th><th>Avance</th><th>Tiempo</th><th>Entrega</th>
+          </tr></thead>
+          <tbody>${filas.join("")}</tbody>
+        </table>
+      </div>
+      <footer>Área 52 · Documento generado automáticamente</footer>
+    </section>
+  </main>
+</body>
+</html>`;
+  const blob = new Blob([report], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  const slug = currentSimulacroTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "simulacro";
   link.href = url;
-  link.download = `notas-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `reporte-${slug}-${new Date().toISOString().slice(0, 10)}.html`;
   document.body.appendChild(link);
   link.click();
   link.remove();
