@@ -4,6 +4,9 @@ let currentEditId = null;
 let currentType = null;
 let questions = [];
 let existingFiles = [];
+let currentSimulacroResults = [];
+let currentSimulacroTitle = "";
+let currentSimulacroTotalPreguntas = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   checkAuth();
@@ -907,6 +910,7 @@ window.viewSimulacroResults = async function(simulacroId) {
   const title = document.getElementById("modal-title");
   const body = document.getElementById("modal-body");
   const saveBtn = document.getElementById("modal-save-btn");
+  currentSimulacroResults = [];
   saveBtn.style.display = "none";
 
   title.textContent = "Resultados del Simulacro";
@@ -927,9 +931,15 @@ window.viewSimulacroResults = async function(simulacroId) {
     }
 
     const totalPreguntas = simulacro?.preguntas?.length || 65;
+    currentSimulacroResults = submissions;
+    currentSimulacroTitle = simulacro?.titulo || "Simulacro";
+    currentSimulacroTotalPreguntas = totalPreguntas;
 
     let html = `
-      <h3 style="color:#1a1a2e; margin-bottom:1rem;">${simulacro?.titulo || 'Simulacro'}</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+      <h3 style="color:#1a1a2e; margin:0;">${simulacro?.titulo || 'Simulacro'}</h3>
+      <button class="btn btn-primary" type="button" onclick="exportSimulacroResults()">⬇ Exportar a Excel (.csv)</button>
+      </div>
       <p style="color:#666; margin-bottom:1.5rem;">${submissions.length} estudiante(s) presentaron este examen</p>
       <div style="overflow-x: auto;">
         <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
@@ -983,6 +993,58 @@ window.viewSimulacroResults = async function(simulacroId) {
   } catch (err) {
     body.innerHTML = `<p style="color:#e74c3c; text-align:center;">Error al cargar: ${err.message}</p>`;
   }
+};
+
+window.exportSimulacroResults = function() {
+  if (!currentSimulacroResults.length) {
+    alert("No hay resultados para exportar.");
+    return;
+  }
+
+  const escapeCsv = (value) => {
+    let text = String(value ?? "");
+    if (/^\s*[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const rows = [
+    ["Puesto", "Nombre", "WhatsApp", "Correo", "Nota /20", "Puntaje", "Correctas", "Porcentaje", "Tiempo (mm:ss)", "Fecha de entrega"]
+  ];
+
+  currentSimulacroResults.forEach((s, index) => {
+    const correctCount = s.area_results
+      ? Object.values(s.area_results).reduce((sum, area) => sum + (area.correct || 0), 0)
+      : 0;
+    const elapsed = Math.max(0, Number(s.tiempo_segundos) || 0);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    rows.push([
+      index + 1,
+      s.nombre_completo || "Sin nombre",
+      s.whatsapp || "",
+      s.estudiante_email || "",
+      (s.nota != null ? Number(s.nota) : 0).toFixed(2).replace(".", ","),
+      (Number(s.puntaje) || 0).toFixed(2).replace(".", ","),
+      `${correctCount}/${currentSimulacroTotalPreguntas}`,
+      `${Number(s.porcentaje) || 0}%`,
+      `${mins}:${String(secs).padStart(2, "0")}`,
+      s.fecha_fin || ""
+    ]);
+  });
+
+  const csv = "\ufeffsep=;\r\n" + rows
+    .map((row) => row.map(escapeCsv).join(";"))
+    .join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const slug = currentSimulacroTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "simulacro";
+  link.href = url;
+  link.download = `notas-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 window.viewStudentDetail = async function(submissionId) {
