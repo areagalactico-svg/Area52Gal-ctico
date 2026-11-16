@@ -1038,6 +1038,20 @@
 
             test.preguntas.forEach((q, qi) => {
                 const selected = answers[qi];
+                const nOpciones = Array.isArray(q.opciones) ? q.opciones.length : 0;
+                const claveValida = Number.isInteger(q.respuestaCorrecta) && q.respuestaCorrecta >= 0 && q.respuestaCorrecta < nOpciones;
+                if (!claveValida) {
+                    // Pregunta SIN CLAVE VÁLIDA → se ANULA: no puntúa ni penaliza
+                    details.push({
+                        index: qi, texto: q.texto, opciones: q.opciones || [],
+                        selected: selected, correct: null,
+                        isCorrect: false, isBlank: selected === undefined || selected === null,
+                        claveInvalida: true,
+                        explicacion: "⚠ Pregunta anulada (sin clave de respuesta válida): no se toma en cuenta en la nota.",
+                        area: q.area || '', subtema: q.subtema || '', puntos: 0
+                    });
+                    return;
+                }
                 const isCorrect = selected === q.respuestaCorrecta;
                 const isBlank = selected === undefined || selected === null;
                 const area = q.area || 'default';
@@ -1071,10 +1085,11 @@
             });
 
             const total = test.preguntas.length;
-            const maxPuntaje = total * 2.00;
+            const evaluables = details.filter((d) => !d.claveInvalida).length;
+            const maxPuntaje = Math.max(1, evaluables) * 2.00;
             const pct = Math.round((puntajeTotal / maxPuntaje) * 100);
             const nota = Math.max(0, Math.min(20, (puntajeTotal / maxPuntaje) * 20));
-            return { details, areaResults, puntajeTotal, correct, total, pct, nota, elapsed: elapsedSec };
+            return { details, areaResults, puntajeTotal, correct, total, evaluables, pct, nota, elapsed: elapsedSec };
         }
 
         // ============================================================
@@ -1097,6 +1112,13 @@
             const areaAcc = {};
             test.preguntas.forEach((q, qi) => {
                 const sel = answers[qi];
+                const nOpciones = Array.isArray(q.opciones) ? q.opciones.length : 0;
+                const claveValida = Number.isInteger(q.respuestaCorrecta) && q.respuestaCorrecta >= 0 && q.respuestaCorrecta < nOpciones;
+                if (!claveValida) {
+                    // Pregunta anulada: fuera del puntaje y del máximo posible
+                    det.push({ qi, area: q.area || '', isCorrect: false, isBlank: false, wrong: false, invalida: true, pts: 0 });
+                    return;
+                }
                 const isBlank = sel === undefined || sel === null;
                 const isCorrect = !isBlank && sel === q.respuestaCorrecta;
                 const a = q.area || 'default';
@@ -1414,21 +1436,22 @@
         function buildSolucionarioHTML(details) {
             let solucionario = '<div style="margin:2rem 0;text-align:left;max-width:700px;margin-left:auto;margin-right:auto;"><h3 style="margin-bottom:1rem;color:#1a1a2e;text-align:center;">Solucionario y Correccion</h3>';
             details.forEach((d, i) => {
-                const icon = d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : d.isBlank ? '<span style="color:#f39c12;font-weight:bold;">En blanco</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
+                const anulada = !!d.claveInvalida;
+                const icon = anulada ? '<span style="color:#8e8e8e;font-weight:bold;">⚠ Anulada</span>' : d.isCorrect ? '<span style="color:#00c896;font-weight:bold;">Correcta</span>' : d.isBlank ? '<span style="color:#f39c12;font-weight:bold;">En blanco</span>' : '<span style="color:#e74c3c;font-weight:bold;">Incorrecta</span>';
                 const tag = d.isBlank ? "Sin tiempo" : (d.area === "PE1" ? "Concepto" : "Cálculo");
-                const due = !d.isCorrect ? '<span style="background:#fde8e8; color:#c0392b; padding:0.1rem 0.5rem; border-radius:10px; font-size:0.72rem; margin-left:0.4rem;">Repasar en 3 días</span>' : "";
+                const due = (!d.isCorrect && !anulada) ? '<span style="background:#fde8e8; color:#c0392b; padding:0.1rem 0.5rem; border-radius:10px; font-size:0.72rem; margin-left:0.4rem;">Repasar en 3 días</span>' : "";
                 const selectedText = d.selected !== undefined ? d.opciones[d.selected] : '<em>No respondida</em>';
-                const correctText = d.opciones[d.correct];
+                const correctText = anulada ? '<em>Pregunta anulada (sin clave válida): no se toma en cuenta</em>' : d.opciones[d.correct];
                 const areaColor = d.area === 'PE1' ? '#3498db' : d.area === 'PE2' ? '#e74c3c' : d.area === 'PE3' ? '#2ecc71' : '#ff6b6b';
                 solucionario += `
-                    <div style="background:${d.isCorrect ? '#f0faf7' : d.isBlank ? '#fffbf0' : '#fff5f5'};border:1px solid ${d.isCorrect ? '#00c89633' : d.isBlank ? '#f39c1233' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
+                    <div style="background:${anulada ? '#f6f6f8' : d.isCorrect ? '#f0faf7' : d.isBlank ? '#fffbf0' : '#fff5f5'};border:1px solid ${anulada ? '#cccccc55' : d.isCorrect ? '#00c89633' : d.isBlank ? '#f39c1233' : '#e74c3c33'};border-radius:8px;padding:1rem;margin-bottom:0.8rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                            <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''} ${!d.isCorrect ? `<span style="background:#fde8e8;color:#c0392b;padding:0.1rem 0.5rem;border-radius:10px;font-size:0.72rem;">${tag}</span>${due}` : ''}</span>
+                            <span style="font-weight:bold;">${i + 1}. ${d.area ? `<span style="background:${areaColor};color:white;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.area}</span>` : ''} ${d.subtema ? `<span style="background:#f0f0f0;color:#333;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.7rem;">${d.subtema}</span>` : ''} ${!d.isCorrect && !anulada ? `<span style="background:#fde8e8;color:#c0392b;padding:0.1rem 0.5rem;border-radius:10px;font-size:0.72rem;">${tag}</span>${due}` : ''}</span>
                             <span>${icon} <span style="font-weight:bold;color:${d.puntos >= 0 ? '#00c896' : '#e74c3c'};">${d.puntos >= 0 ? '+' : ''}${d.puntos.toFixed(2)} pts</span></span>
                         </div>
                         <p style="margin-bottom:0.5rem;color:#333;">${d.texto}</p>
                         <p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Tu respuesta:</strong> ${selectedText}</p>
-                        ${!d.isCorrect ? `<p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>Respuesta correcta:</strong> ${correctText}</p>` : ''}
+                        ${!d.isCorrect ? `<p style="margin-bottom:0.3rem;font-size:0.9rem;"><strong>${anulada ? 'Estado' : 'Respuesta correcta'}:</strong> ${correctText}</p>` : ''}
                         ${d.explicacion ? `<p style="color:#666;font-size:0.85rem;margin-top:0.5rem;font-style:italic;">${d.explicacion}</p>` : ''}
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.7rem;">
                             <button class="filter-btn" style="font-size:0.78rem; padding:0.3rem 0.8rem;" onclick="tutorEstudiar(window._ultimoResultado.state.details[${i}].texto, 'pista')">💡 Pedir pista al tutor</button>
@@ -1487,7 +1510,7 @@
                     </div>
                     <p style="color:#888;font-size:1rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.3rem;">Tu nota IEN</p>
                     <h2 style="color:#ff6b6b;font-size:3.5rem;margin:0;">${nota.toFixed(1)} <span style="font-size:1.5rem;color:#888;">/ 20</span></h2>
-                    <p style="font-size:1.1rem;color:#333;margin-top:0.8rem;">${puntajeTotal.toFixed(2)} pts | ${pct}% de calificacion | ${correct}/${total} correctas</p>
+                    <p style="font-size:1.1rem;color:#333;margin-top:0.8rem;">${puntajeTotal.toFixed(2)} pts | ${pct}% de calificacion | ${correct}/${state.evaluables ?? total} correctas${(state.evaluables ?? total) < total ? ` <span style="color:#888;font-size:0.9rem;">(${total - (state.evaluables ?? total)} anulada(s) sin clave)</span>` : ""}</p>
                     <p style="color:#888;margin:0.5rem 0;">Tiempo: ${elapsedMin} minutos · ${tppTxt} por pregunta${topTxt ? ` · <strong style="color:#00a37a;">${topTxt}</strong> entre estudiantes de Área 52` : ""}</p>
                     ${lb && lb.rank > 0 ? `<p style="font-size:1.2rem;font-weight:bold;color:#1a1a2e;margin:1rem 0;">🏆 Tu puesto: N° ${lb.rank} de ${lb.rows.length}</p>` : ''}
                     <p style="font-size:1.1rem;color:#666;margin:1.5rem 0;">${resultadoMsg}</p>

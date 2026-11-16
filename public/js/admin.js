@@ -274,13 +274,14 @@ window.openModal = async function(type, editData = null, editId = null) {
         <div class="form-group">
           <label>Archivos del examen (PDF o imágenes)</label>
           <input type="file" id="field-archivos" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">El PDF original como respaldo.</small>
+          <small style="color: #888;">El PDF original. Si el campo de texto está vacío, su texto se extrae automáticamente al guardar.</small>
           <div id="existing-files-container" style="margin-top: 0.5rem;"></div>
         </div>
         <div class="form-group">
           <label>Contenido del examen (texto copiado del PDF)</label>
           <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA usará este contenido para generar las 60 preguntas del simulacro.">${editData?.contenido_texto || ""}</textarea>
           <small style="color: #888;">Pega el texto del examen. La IA lo usará como fuente principal.</small>
+          <br><button type="button" class="btn btn-sm" onclick="extraerTextoPDFAlFormulario(this)" style="margin-top: 0.5rem;">📄 Extraer texto de los PDFs subidos</button>
         </div>
         <div class="form-group">
           <label>Preguntas interactivas (${questions.length} actuales)</label>
@@ -421,11 +422,12 @@ window.openModal = async function(type, editData = null, editId = null) {
           <label>Contenido del examen (texto copiado del PDF)</label>
           <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA podrá leer este contenido y generar preguntas similares.">${editData?.contenido_texto || ""}</textarea>
           <small style="color: #888;">Pega el texto del examen. La IA lo usará para generar simulacros con el mismo estilo y nivel.</small>
+          <br><button type="button" class="btn btn-sm" onclick="extraerTextoPDFAlFormulario(this)" style="margin-top: 0.5rem;">📄 Extraer texto de los PDFs subidos</button>
         </div>
         <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-examen" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">El PDF original como respaldo. La IA lee el texto de arriba.</small>
+          <small style="color: #888;">El PDF original. Al guardar, si el campo de texto está vacío, se extrae el texto del PDF automáticamente.</small>
           <div id="existing-examen-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -483,11 +485,12 @@ window.openModal = async function(type, editData = null, editId = null) {
           <label>Contenido del examen (texto copiado del PDF)</label>
           <textarea id="field-contenido_texto" style="min-height: 200px; font-family: monospace; font-size: 0.85rem;" placeholder="Copia y pega aquí el texto del examen. Ejemplo:&#10;&#10;PREGUNTA 1: ¿Cuál es el resultado de...?&#10;A) 12  B) 15  C) 18  D) 21  E) 24&#10;&#10;La IA podrá leer este contenido y generar preguntas similares o extraer algunas directamente.">${editData?.contenido_texto || ""}</textarea>
           <small style="color: #888;">Pega el texto del examen aquí. La IA lo usará como fuente principal para generar las 60 preguntas del simulacro IEN.</small>
+          <br><button type="button" class="btn btn-sm" onclick="extraerTextoPDFAlFormulario(this)" style="margin-top: 0.5rem;">📄 Extraer texto de los PDFs subidos</button>
         </div>
         <div class="form-group">
           <label>Archivos (PDF o imágenes)</label>
           <input type="file" id="field-archivos-material" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="margin-bottom: 0.5rem;">
-          <small style="color: #888;">Sube el PDF original como respaldo. La IA lee el texto de arriba, no el PDF.</small>
+          <small style="color: #888;">Sube el PDF original. Al guardar, si el campo de texto está vacío, se extrae el texto del PDF automáticamente.</small>
           <div id="existing-material-files" style="margin-top: 0.5rem;"></div>
         </div>
       `;
@@ -511,8 +514,142 @@ window.closeModal = function() {
   existingFiles = [];
 };
 
+// ============================================================
+// VALIDACIÓN DE PREGUNTAS — impide guardar o generar preguntas
+// SIN CLAVE DE RESPUESTA CORRECTA (problema del simulacro anterior).
+// ============================================================
+function erroresPreguntasSimulacro(preguntas) {
+  const errores = [];
+  (preguntas || []).forEach((q, i) => {
+    const n = `Pregunta ${i + 1}`;
+    if (!q || typeof q !== "object") { errores.push(`${n}: inválida`); return; }
+    if (!String(q.texto || "").trim()) errores.push(`${n}: sin enunciado`);
+    const opts = Array.isArray(q.opciones) ? q.opciones : [];
+    if (opts.length !== 5) errores.push(`${n}: tiene ${opts.length} opciones (se requieren 5: A-E)`);
+    opts.forEach((o, oi) => { if (!String(o || "").trim()) errores.push(`${n}: opción ${oi + 1} vacía`); });
+    const rc = q.respuestaCorrecta;
+    if (!Number.isInteger(rc) || rc < 0 || rc >= opts.length) {
+      errores.push(`${n}: ⚠ SIN CLAVE DE RESPUESTA VÁLIDA (valor: ${JSON.stringify(rc)})`);
+    } else if (!String(opts[rc] || "").trim()) {
+      errores.push(`${n}: ⚠ la clave apunta a una opción vacía`);
+    }
+  });
+  return errores;
+}
+
+function esPreguntaValidaSimulacro(q) {
+  return erroresPreguntasSimulacro([q]).length === 0;
+}
+
+function erroresPreguntasTest(preguntas) {
+  const errores = [];
+  (preguntas || []).forEach((q, i) => {
+    const n = `Pregunta ${i + 1}`;
+    if (!String(q?.texto || "").trim()) errores.push(`${n}: sin enunciado`);
+    const opts = Array.isArray(q?.opciones) ? q.opciones : [];
+    if (opts.length < 4) errores.push(`${n}: tiene ${opts.length} opciones (mínimo 4)`);
+    opts.forEach((o, oi) => { if (!String(o || "").trim()) errores.push(`${n}: opción ${oi + 1} vacía`); });
+  });
+  return errores;
+}
+
+// ============================================================
+// EXTRACCIÓN DE TEXTO DE PDFs (pdf.js desde CDN): convierte el
+// material subido (PDF) en TEXTO para que la IA genere el
+// simulacro BASADO en ese material (fuente principal).
+// ============================================================
+let _pdfJsCargado = null;
+function cargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!_pdfJsCargado) {
+    _pdfJsCargado = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => { _pdfJsCargado = null; reject(new Error("No se pudo cargar el lector de PDF (verifica tu conexión a internet)")); };
+      document.head.appendChild(s);
+    });
+  }
+  return _pdfJsCargado;
+}
+
+async function extraerTextoDePDF(fuente, nombre) {
+  const pdfjs = await cargarPdfJs();
+  let data;
+  if (typeof fuente === "string") {
+    const r = await fetch(fuente);
+    if (!r.ok) throw new Error(`No se pudo descargar ${nombre || "el PDF"} (HTTP ${r.status})`);
+    data = await r.arrayBuffer();
+  } else {
+    data = fuente;
+  }
+  const doc = await pdfjs.getDocument({ data }).promise;
+  let texto = "";
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    texto += content.items.map((it) => it.str || "").join(" ") + "\n\n";
+  }
+  return texto.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function extraerTextoDeArchivos(archivos) {
+  const partes = [];
+  for (const a of archivos || []) {
+    if (!/\.pdf(\?|#|$)/i.test(a.url || a.name || "")) continue;
+    try {
+      const t = await extraerTextoDePDF(a.url, a.name);
+      if (t) partes.push(`=== ${a.name || "PDF"} ===\n${t}`);
+    } catch (e) {
+      console.warn("No se pudo leer el PDF", a.name, e);
+    }
+  }
+  return partes.join("\n\n").trim();
+}
+
+// Botón "📄 Extraer texto de los PDFs subidos" (modales con contenido_texto)
+window.extraerTextoPDFAlFormulario = async function (btn) {
+  const ta = document.getElementById("field-contenido_texto");
+  if (!ta) return;
+  const input = document.getElementById("field-archivos-material") || document.getElementById("field-archivos-examen") || document.getElementById("field-archivos");
+  const nuevos = input ? Array.from(input.files || []).filter((f) => /\.pdf$/i.test(f.name)) : [];
+  const subidos = (existingFiles || []).filter((f) => /\.pdf(\?|#|$)/i.test(f.url || f.name || ""));
+  if (!subidos.length && !nuevos.length) {
+    alert("No hay PDFs disponibles. Sube un PDF primero (o pega el texto manualmente).");
+    return;
+  }
+  if (ta.value.trim() && !confirm("El campo ya tiene texto. ¿Reemplazarlo con el texto extraído de los PDFs?")) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳ Extrayendo texto del PDF...";
+  try {
+    const partes = [];
+    for (const f of nuevos) partes.push(`=== ${f.name} ===\n${await extraerTextoDePDF(await f.arrayBuffer(), f.name)}`);
+    const deSubidos = await extraerTextoDeArchivos(subidos);
+    if (deSubidos) partes.push(deSubidos);
+    const texto = partes.filter(Boolean).join("\n\n").trim();
+    if (!texto) {
+      alert("El PDF no contiene texto extraíble (parece un escaneo/imagen). Pega el texto manualmente en el campo.");
+    } else {
+      ta.value = texto;
+      alert(`✅ Texto extraído: ${texto.length} caracteres. La IA ahora podrá basarse en este material para generar el simulacro.`);
+    }
+  } catch (e) {
+    alert("Error al extraer el texto: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+};
+
 window.addQuestion = function() {
-  questions.push({ texto: "", opciones: ["", "", "", ""], respuestaCorrecta: 0 });
+  const nOpciones = currentType === "simulacro" ? 5 : 4;
+  // respuestaCorrecta: null a propósito → el admin DEBE elegir la opción
+  // correcta (radio button); si no, saveItem bloquea el guardado.
+  questions.push({ texto: "", opciones: Array(nOpciones).fill(""), respuestaCorrecta: null });
   renderQuestions();
 };
 
@@ -641,6 +778,29 @@ const BUCKET_MAP = {
 };
 
 async function saveItem() {
+  // ------------------------------------------------------------
+  // BLOQUEO DE GUARDADO: ninguna pregunta sin clave de respuesta
+  // correcta puede guardarse (evita el problema del simulacro anterior).
+  // ------------------------------------------------------------
+  if (currentType === "simulacro") {
+    const errores = erroresPreguntasSimulacro(questions);
+    if (errores.length) {
+      alert("❌ NO se puede guardar: preguntas sin clave de respuesta correcta.\n\n" +
+        errores.slice(0, 12).join("\n") +
+        (errores.length > 12 ? `\n... y ${errores.length - 12} más` : "") +
+        "\n\nSolución: marca el radio de la opción correcta en cada pregunta señalada.");
+      return;
+    }
+  } else if (currentType === "test") {
+    const errores = erroresPreguntasTest(questions);
+    if (errores.length) {
+      alert("❌ NO se puede guardar el test:\n\n" +
+        errores.slice(0, 12).join("\n") +
+        (errores.length > 12 ? `\n... y ${errores.length - 12} más` : ""));
+      return;
+    }
+  }
+
   const data = {};
   const table = TABLE_MAP[currentType];
 
@@ -723,6 +883,23 @@ async function saveItem() {
       break;
   }
 
+  // ------------------------------------------------------------
+  // Si el campo de texto quedó vacío, se extrae automáticamente
+  // del PDF subido → el material queda disponible como FUENTE
+  // principal para la IA del simulacro.
+  // ------------------------------------------------------------
+  if ("contenido_texto" in data && !String(data.contenido_texto || "").trim() && Array.isArray(data.archivos)) {
+    const pdfs = data.archivos.filter((f) => /\.pdf(\?|#|$)/i.test(f.url || ""));
+    if (pdfs.length) {
+      try {
+        const textoPDF = await extraerTextoDeArchivos(pdfs);
+        if (textoPDF) data.contenido_texto = textoPDF;
+      } catch (e) {
+        console.warn("Extracción de texto del PDF fallida:", e);
+      }
+    }
+  }
+
   data.fecha = new Date().toISOString();
 
   try {
@@ -758,7 +935,7 @@ window.deleteItem = async function(table, id) {
 };
 
 window.generateSimulacroQuestions = async function(simulacroId) {
-  if (!confirm("Se generaran 65 preguntas con IA para este simulacro. Continuar?")) return;
+  if (!confirm("Se generarán 65 preguntas de MÁXIMO NIVEL con IA para este simulacro:\n\n• Basadas en el material subido (fuente principal)\n• Con CLAVE DE RESPUESTA verificada por IA\n• Sin repetición con el banco de preguntas\n\n¿Continuar?")) return;
 
   const btn = event.target;
   btn.disabled = true;
@@ -813,6 +990,12 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       }
     } catch(e) {}
 
+    context = context.slice(0, 40000);
+
+    if (!context.trim()) {
+      if (!confirm("⚠ No se encontró material CON TEXTO (los PDF aún no tienen texto extraído).\n\nLa IA generaría con su conocimiento general, NO con el material subido.\n\nPara usarlo: edita el material o el simulacro y pulsa \"📄 Extraer texto de los PDFs subidos\" (o pega el texto manualmente).\n\n¿Continuar igualmente?")) return;
+    }
+
     const bloques = [
       { seccion: "razonamiento_matematico", cantidad: 12 },
       { seccion: "razonamiento_verbal", cantidad: 13 },
@@ -823,25 +1006,31 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       { seccion: "humanidades_pe3", cantidad: 6 }
     ];
     const preguntas = [];
+    const statsAuditoria = { corregidas: 0, descartadas: 0 };
     const exclusiones = (simulacro.preguntas || []).map(q => q.texto);
     let bloquesCompletados = 0;
 
     const generarBloque = async (bloque, indice) => {
       const preguntasBloque = [];
-      for (let intento = 0; intento < 2 && preguntasBloque.length < bloque.cantidad; intento++) {
+      let intentos = 0;
+      while (preguntasBloque.length < bloque.cantidad) {
+        if (++intentos > 10) {
+          throw new Error(`El bloque ${indice + 1} no completó tras 10 intentos (${preguntasBloque.length}/${bloque.cantidad}). Revisa el material e inténtalo de nuevo.`);
+        }
         const faltan = bloque.cantidad - preguntasBloque.length;
-        btn.textContent = `Generando ${bloquesCompletados}/${bloques.length} bloques...`;
+        const cantidadSolicitud = Math.min(faltan, 4);
+        btn.textContent = `Generando bloque ${indice + 1}/${bloques.length} (${preguntasBloque.length}/${bloque.cantidad})...`;
         const res = await fetch("/api/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             topic: "Examen Completo IEN",
             type: "simulacro",
-            count: faltan,
+            count: cantidadSolicitud,
             batch_section: bloque.seccion,
             context: context,
             universidad: simulacro.universidad || "UNI",
-            exclude_textos: exclusiones.concat(preguntas).map(q => typeof q === "string" ? q : q.texto)
+            exclude_textos: exclusiones.concat(preguntas, preguntasBloque).map(q => typeof q === "string" ? q : q.texto)
           })
         });
 
@@ -859,7 +1048,14 @@ window.generateSimulacroQuestions = async function(simulacroId) {
         if (!Array.isArray(data.preguntas) || !data.preguntas.length) {
           throw new Error(`No se pudieron generar preguntas para el bloque ${indice + 1}.`);
         }
-        preguntasBloque.push(...data.preguntas.slice(0, faltan));
+        if (data.auditoria) {
+          statsAuditoria.corregidas += data.auditoria.corregidas || 0;
+          statsAuditoria.descartadas += data.auditoria.descartadas || 0;
+        }
+        // Ninguna pregunta sin clave de respuesta correcta entra al simulacro
+        const validas = data.preguntas.filter(esPreguntaValidaSimulacro);
+        if (!validas.length) continue; // la IA devolvió solo inválidas → se repite
+        preguntasBloque.push(...validas.slice(0, faltan));
       }
       if (preguntasBloque.length !== bloque.cantidad) {
         throw new Error(`El bloque ${indice + 1} devolvió ${preguntasBloque.length} de ${bloque.cantidad} preguntas.`);
@@ -879,6 +1075,12 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       resultados.forEach(resultado => preguntas.push(...resultado.value));
     }
 
+    // ÚLTIMA LÍNEA DE DEFENSA: ninguna pregunta sin clave correcta se guarda
+    const erroresFinales = erroresPreguntasSimulacro(preguntas);
+    if (erroresFinales.length) {
+      throw new Error(`Se generaron preguntas sin clave correcta:\n${erroresFinales.slice(0, 8).join("\n")}`);
+    }
+
     if (preguntas.length === 65) {
       const { error: updateError } = await supabase
         .from("simulacros_ien")
@@ -891,7 +1093,11 @@ window.generateSimulacroQuestions = async function(simulacroId) {
       if (updateError) {
         alert("Error al guardar las preguntas: " + updateError.message);
       } else {
-        alert(`Se generaron ${preguntas.length} preguntas nuevas sin repetición!`);
+        let msg = `✅ Se generaron ${preguntas.length} preguntas nuevas sin repetición, todas con clave de respuesta verificada!`;
+        if (statsAuditoria.corregidas || statsAuditoria.descartadas) {
+          msg += `\n\n🔍 Auditoría con IA: ${statsAuditoria.corregidas} clave(s) corregida(s), ${statsAuditoria.descartadas} pregunta(s) defectuosa(s) descartada(s).`;
+        }
+        alert(msg);
         loadAllData();
       }
     } else {

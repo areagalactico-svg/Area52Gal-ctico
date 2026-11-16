@@ -12,10 +12,11 @@ CREATE TABLE IF NOT EXISTS config_plataforma (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Estado inicial: notas visibles
+-- Deja las notas visibles, incluso si antes se habían ocultado.
 INSERT INTO config_plataforma (clave, valor, updated_at)
 VALUES ('notas_ocultas', 'false', NOW())
-ON CONFLICT (clave) DO NOTHING;
+ON CONFLICT (clave) DO UPDATE
+SET valor = 'false', updated_at = NOW();
 
 ALTER TABLE config_plataforma ENABLE ROW LEVEL SECURITY;
 

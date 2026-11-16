@@ -4,9 +4,15 @@
 // - type "simulacro": cada pregunta generada se compara contra el
 //   BANCO (tabla banco_preguntas) y contra exclude_textos (preguntas
 //   que el estudiante ya vio). Se descartan hashes iguales y textos
-//   con similitud >= 0.85. Si faltan, se reintenta 1 vez con la
-//   lista de exclusión en el prompt. Las nuevas se guardan en el banco.
-// - Otros types (vocacional): solo deduplicación dentro del lote.
+//   con similitud >= 0.85. Si faltan, se reintenta con la lista de
+//   exclusión en el prompt. Las nuevas se guardan en el banco.
+// - VALIDACIÓN DE CLAVE: toda pregunta de simulacro DEBE traer
+//   respuestaCorrecta (entero 0-4 dentro del rango de opciones) y
+//   5 opciones (A-E) completas; si no, se descarta y se pide otra.
+// - AUDITORÍA CON IA: antes de responder, una IA resuelve cada
+//   pregunta y corrige/elimina las cuya clave marcada no sea la
+//   correcta (solo type "simulacro").
+// - Otros types (vocacional): validación ligera + dedup en el lote.
 // ============================================================
 const crypto = require("crypto");
 
@@ -17,7 +23,7 @@ const SUPABASE_ANON =
 const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_KEY || null;
 
 const UMBRAL_SIMILITUD = 0.85;
-const MAX_INTENTOS = 2;
+const MAX_INTENTOS = 3;
 const BATCH_SECTION_PROMPTS = {
   razonamiento_matematico: "Razonamiento Matemático de Aptitud Académica (PE1): sucesiones no obvias, análisis de figuras, conteo, lógica y juegos lógicos.",
   razonamiento_verbal: "Razonamiento Verbal de Aptitud Académica (PE1): comprensión lectora con textos densos e inferencia, analogías de segundo orden, semántica y ortografía.",
@@ -27,6 +33,42 @@ const BATCH_SECTION_PROMPTS = {
   quimica: "Química de Conocimientos (PE2): estructura atómica, enlaces, estequiometría y reacciones; incluye reactivo limitante o impurezas cuando corresponda.",
   humanidades_pe3: "Humanidades y Cultura General de Conocimientos (PE3): Literatura, Historia, Geografía y Economía; prioriza preguntas relacionales, no fechas aisladas.",
 };
+
+// ------------------------------------------------------------
+// REGLAS COMPARTIDAS: se inyectan en TODOS los prompts de
+// simulacro (examen completo y por bloques) para que cada
+// generación tenga el MÁXIMO nivel exigido por la sección.
+// ------------------------------------------------------------
+const REGLAS_NIVEL = `- Nivel: examen de admisión UNI (el más exigente del Perú). Un postulante promedio resuelve MENOS del 40%: calibra así.
+- El examen IEN usa 5 opciones (A-E)
+- Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
+- DIFICULTAD OBLIGATORIA: 100% altas. 0% medias, 0% fáciles. Marca cada una en "dificultad": "alta".
+- PROHIBIDO: preguntas de un solo paso, cálculo directo (ej. "¿Cuánto es 2+2?"), definiciones de memoria ("¿Qué es...?"), textos de menos de 80 palabras en comprensión lectora, sucesiones aritméticas obvias.
+- APLICACIÓN DIRECTA PROHIBIDA: si se resuelve con una sola fórmula o una sola observación, NO es alta. Ejemplos de nivel MEDIO que debes ELEVAR (no los copies, úsalos como piso mínimo):
+  * "Si log2(x) + log2(x-2) = 3, halle x^2 - 2x" → MEDIO (colapsa en una observación). Versión ALTA: agrega parámetro k, condición de existencia y descarte de raíces extrañas, o combina con inecuación.
+  * "Triángulo rectángulo de hipotenusa 13 y cateto 5, halle sen(2θ)" → MEDIO (fórmula directa sobre terna notable). Versión ALTA: el triángulo debe deducirse de una condición previa (semejanza, área dada, trazo auxiliar) antes de aplicar ángulo doble.
+  Regla de oro: el estudiante debe ATASCARSE al menos una vez y necesitar un insight intermedio (despeje no obvio, trazo auxiliar, cambio de variable, descarte de casos, interpretación de un dato oculto).
+- Cada pregunta "alta" DEBE exigir 2 o más conceptos combinados y tener al menos 3 pasos de resolución (lista los pasos en "pasos"). Si no llega a 3 pasos, no es alta: elévala.
+- Distractores trampa: cada distractor debe corresponder a un ERROR TÍPICO real (signo cambiado, fórmula a medias, lectura parcial del texto, confundir área con perímetro, olvidar el reactivo limitante, etc.).
+- Números no triviales: evita resultados enteros obvios; usa fracciones, radicales y decimales como el examen real.
+- Por área, exige esto:
+  * Aritmética/Álgebra: combina 2 temas (ej. divisibilidad + ecuaciones; funciones + desigualdades).
+  * Geometría/Trigonometría: exige trazo auxiliar, semejanza o identidad no inmediata.
+  * Física: combina 2 principios (ej. dinámica + trabajo-energía; hidrostática + empuje con densidades compuestas).
+  * Química: estequiometría con reactivo limitante o impurezas; nada de preguntas de completar la tabla periódica.
+  * Razonamiento Matemático: juegos lógicos de 4+ condiciones o conteo con casos múltiples, no series de +2.
+  * Razonamiento Verbal: textos densos de 150+ palabras con inferencia (nada literal), analogías de 2do orden.
+  * Humanidades: pregunta relacional (causa-efecto, compara autores/hechos), no fechas sueltas de memoria.
+- ANCLAS DE NIVEL (iguala o supera esta dificultad):
+  * Álgebra: "Si x + 1/x = 4, calcule x^4 + 1/x^4" (exige ver el cuadrado iterado, no reemplazo directo).
+  * Geometría: hallar un área sombreada que obliga a restar sectores y usar semejanza antes de operar.
+  * Física: un bloque que desliza por un plano inclinado con fricción y luego comprime un resorte: pide la compresión máxima (dinámica + energía + condición de equilibrio).
+- NO repitas conceptos entre preguntas
+- CADA PREGUNTA DEBE SER ÚNICA: varía datos numéricos, contextos y enfoques aunque el subtema se repita`;
+
+const REGLAS_CLAVE = `- "respuestaCorrecta" DEBE ser un NÚMERO ENTERO del 0 al 4: el índice de la ÚNICA opción correcta (0=A, 1=B, 2=C, 3=D, 4=E). NUNCA lo dejes sin definir, en 0 por defecto, como cadena de texto ("2") o apuntando a una opción vacía.
+- ANTES de responder, RESUELVE cada pregunta paso a paso y confirma que exactamente UNA opción es correcta y que es la que marcaste en "respuestaCorrecta". Si no puedes resolverla con certeza, NO la incluyas.
+- Las 5 opciones deben ser textos distintos, plausibles y no vacíos; solo una es correcta.`;
 
 // Normalización canónica (EL CLIENTE USA LA MISMA REGLA para vistas)
 function normalizarTexto(s) {
@@ -81,7 +123,7 @@ function similitud(a, b) {
 async function cargarBanco(universidad) {
   const vacio = { hashes: new Set(), entradas: [], normas: [] };
   try {
-    const u = `${SUPABASE_URL}/rest/v1/banco_preguntas?select=hash,texto_norm,opciones_hash,numeros&universidad=eq.${encodeURIComponent(universidad)}&limit=5000`;
+    const u = `${SUPABASE_URL}/rest/v1/banco_preguntas?select=hash,texto_norm,opciones_hash,numeros&universidad=eq.${encodeURIComponent(universidad)}&order=created_at.desc&limit=1000`;
     const r = await fetch(u, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } });
     if (!r.ok) return vacio; // tabla aún no creada → sin filtro (no rompe nada)
     const rows = await r.json();
@@ -130,13 +172,43 @@ function esParecida(norm, setsBanco, refsExtra) {
   return false;
 }
 
-// Filtra un lote de la IA. Devuelve { nuevas, repetidas }.
+// ------------------------------------------------------------
+// VALIDACIÓN DE CLAVE DE RESPUESTA (crítica).
+// Devuelve la pregunta con respuestaCorrecta normalizada a entero,
+// o null si es inválida (se descarta y se pide otra a la IA).
+//   - simulacro (IEN): EXIGE 5 opciones (A-E) completas y una
+//     clave entera dentro de rango. Nunca "responde" 0 por defecto.
+//   - vocacional: la clave no define nada, se normaliza a 0.
+// ------------------------------------------------------------
+function validarPreguntaGenerada(q, esSimulacro) {
+  if (!q || typeof q !== "object") return null;
+  if (normalizarTexto(q.texto).length < 10) return null;
+  const opts = Array.isArray(q.opciones) ? q.opciones : [];
+  if (esSimulacro ? opts.length !== 5 : opts.length < 4) return null;
+  if (opts.some((o) => typeof o !== "string" || !o.trim())) return null;
+
+  if (typeof q.respuestaCorrecta === "string" && /^\d+$/.test(q.respuestaCorrecta.trim())) {
+    q = { ...q, respuestaCorrecta: parseInt(q.respuestaCorrecta.trim(), 10) };
+  }
+  if (!Number.isInteger(q.respuestaCorrecta) || q.respuestaCorrecta < 0 || q.respuestaCorrecta >= opts.length) {
+    if (esSimulacro) return null; // simulacro sin clave válida → se descarta
+    q = { ...q, respuestaCorrecta: 0 }; // vocacional: la clave no evalúa nada
+  }
+  if (!String(opts[q.respuestaCorrecta] || "").trim()) return null; // clave apuntando a opción vacía
+  return q;
+}
+
+// Filtra un lote de la IA. Devuelve { nuevas, repetidas, invalidas }.
 // nuevas lleva campos internos texto_norm/hash (se limpian al responder).
-function filtrarLote(candidatas, banco, refsExtra) {
+// esSimulacro activa la validación estricta de clave (5 opciones A-E).
+function filtrarLote(candidatas, banco, refsExtra, esSimulacro = false) {
   const vistas = new Set();
   const nuevas = [];
   let repetidas = 0;
-  for (const q of candidatas || []) {
+  let invalidas = 0;
+  for (const raw of candidatas || []) {
+    const q = validarPreguntaGenerada(raw, esSimulacro);
+    if (!q) { invalidas++; continue; }
     const norm = normalizarTexto(q.texto);
     if (!norm || norm.length < 10) { repetidas++; continue; }
     const cand = {
@@ -157,7 +229,7 @@ function filtrarLote(candidatas, banco, refsExtra) {
     banco.entradas.push(entry);
     nuevas.push({ ...q, texto_norm: norm, hash: cand.hash, optsHash: cand.optsHash, nums: cand.nums });
   }
-  return { nuevas, repetidas };
+  return { nuevas, repetidas, invalidas };
 }
 
 // Auditoría anti-trampa: si la IA etiqueta "alta" una pregunta que por su
@@ -176,15 +248,18 @@ function auditarNivel(preguntas) {
 }
 
 async function guardarBanco(universidad, nuevas) {
-  if (!nuevas.length) return;
+  // Solo se persisten preguntas con clave entera válida (nunca se
+  // guarda un "0" silencioso como clave incorrecta por defecto).
+  const filasOK = nuevas.filter((q) => Number.isInteger(q.respuestaCorrecta));
+  if (!filasOK.length) return;
   const key = SUPABASE_SERVICE || SUPABASE_ANON;
-  const filas = nuevas.map((q) => ({
+  const filas = filasOK.map((q) => ({
     universidad,
     texto: String(q.texto).slice(0, 2000),
     texto_norm: q.texto_norm,
     hash: q.hash,
     opciones: q.opciones || [],
-    respuesta_correcta: Number.isInteger(q.respuestaCorrecta) ? q.respuestaCorrecta : 0,
+    respuesta_correcta: q.respuestaCorrecta,
     opciones_hash: q.optsHash || "",
     numeros: q.nums || "",
     area: q.area || "",
@@ -207,10 +282,9 @@ async function guardarBanco(universidad, nuevas) {
   } catch {} // si falla el guardado, igual se devuelven las preguntas
 }
 
-async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems) {
-  const exclusion = exclusionStems.length
-    ? `\n\nPREGUNTAS PROHIBIDAS (ya existen en el banco o el estudiante ya las vio — NO generes ninguna igual ni reescrita con otras palabras):\n${exclusionStems.map((s) => `- ${s}`).join("\n")}`
-    : "";
+// Llamada genérica a la IA que devuelve el JSON parseado (o null).
+async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
+  const { temperature = 0.9, maxTokens } = opts;
   const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
   const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
   const response = await fetch(AI_URL, {
@@ -225,10 +299,10 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
       model: AI_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Genera las ${n} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? "IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas." : ""}${exclusion}` },
+        { role: "user", content: userPrompt },
       ],
-      max_tokens: 8192,
-      temperature: 0.9,
+      max_tokens: maxTokens,
+      temperature,
     }),
   });
   if (!response.ok) return null;
@@ -237,12 +311,84 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
   try {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.preguntas || !Array.isArray(parsed.preguntas)) return null;
-    return parsed.preguntas;
+    return JSON.parse(jsonMatch[0]);
   } catch {
     return null;
   }
+}
+
+async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems) {
+  const exclusion = exclusionStems.length
+    ? `\n\nPREGUNTAS PROHIBIDAS (ya existen en el banco o el estudiante ya las vio — NO generes ninguna igual ni reescrita con otras palabras):\n${exclusionStems.map((s) => `- ${s}`).join("\n")}`
+    : "";
+  const parsed = await pedirJSON(
+    API_KEY,
+    systemPrompt,
+    `Genera las ${n} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? "IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas." : ""}${exclusion}`,
+    { maxTokens: Math.min(8192, Math.max(2048, n * 1000)) }
+  );
+  if (!parsed || !Array.isArray(parsed.preguntas)) return null;
+  return parsed.preguntas;
+}
+
+// ------------------------------------------------------------
+// AUDITORÍA DE CLAVES CON IA: resuelve cada pregunta generada y
+// verifica que "respuestaCorrecta" apunte a la ÚNICA opción
+// correcta real. Corrige claves equivocadas y elimina preguntas
+// defectuosas (sin respuesta única). Si la auditoría no responde,
+// se conservan las preguntas tal cual (no rompe la generación).
+// ------------------------------------------------------------
+async function auditarClaves(API_KEY, preguntas) {
+  const TAM = 10;
+  const verifs = new Map();
+  for (let i = 0; i < preguntas.length; i += TAM) {
+    const lote = preguntas.slice(i, i + TAM);
+    const sistema = `Eres un verificador de exámenes de admisión IEN UNI (nivel máximo, Perú). Recibirás preguntas de opción múltiple con su clave "respuestaCorrecta" (índice 0-4). Tu trabajo: RESOLVER cada pregunta con cuidado y verificar si la clave marcada es realmente la ÚNICA opción correcta.
+
+Responde SOLO con JSON válido (sin markdown, sin texto extra):
+{"verificaciones":[{"i":0,"clave":2,"valida":true,"motivo":"se resuelve combinando..."}]}
+Donde "i" es el índice de la pregunta en el lote (empezando en 0), "clave" el índice (0-4) de la ÚNICA opción correcta REAL, "valida" false si la pregunta es defectuosa (sin respuesta única, opciones sin sentido, enunciado incompleto o ambiguo) y "motivo" en una frase.
+
+REGLAS:
+- Calcula/resolve matemática, física y química paso a paso antes de decidir; no confíes en la clave original.
+- Si la clave original es correcta, devuelve la misma "clave".
+- Si es incorrecta, devuelve el índice correcto con "valida": true.
+- No reescribas las preguntas; solo verifica y corrige claves.`;
+    const user = JSON.stringify(
+      lote.map((q, k) => ({ i: k, texto: q.texto, opciones: q.opciones, respuestaCorrecta: q.respuestaCorrecta }))
+    );
+    try {
+      const parsed = await pedirJSON(API_KEY, sistema, user, { temperature: 0.2, maxTokens: 4096 });
+      const arr = parsed && Array.isArray(parsed.verificaciones) ? parsed.verificaciones : null;
+      if (!arr) continue; // tanda no auditable → se conserva sin cambios
+      for (const v of arr) {
+        if (v && Number.isInteger(v.i) && v.i >= 0 && v.i < lote.length) verifs.set(i + v.i, v);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  const salida = [];
+  let corregidas = 0;
+  let descartadas = 0;
+  preguntas.forEach((q, idx) => {
+    const v = verifs.get(idx);
+    if (!v) { salida.push(q); return; } // sin verificación → se conserva
+    if (v.valida === false) { descartadas++; return; } // defectuosa → fuera
+    const clave = v.clave;
+    if (Number.isInteger(clave) && clave >= 0 && clave < (q.opciones || []).length) {
+      if (clave !== q.respuestaCorrecta) {
+        corregidas++;
+        salida.push({ ...q, respuestaCorrecta: clave });
+      } else {
+        salida.push(q);
+      }
+    } else {
+      salida.push(q); // verificación ilegible → no tocar
+    }
+  });
+  return { preguntas: salida, corregidas, descartadas, auditadas: verifs.size };
 }
 
 module.exports = async function handler(req, res) {
@@ -409,34 +555,10 @@ ESTRUCTURA DEL EXAMEN IEN (65 preguntas total, 3 horas):
   * Humanidades y Cultura General (6): Literatura, Historia, Geografía
 
 REGLAS:
-- Nivel: examen de admisión UNI (el más exigente del Perú). Un postulante promedio resuelve MENOS del 40%: calibra así.
-- El examen IEN usa 5 opciones (A-E)
-- respuestaCorrecta es el índice (0-4) de la opción correcta
-- Incluye "area" (PE1, PE2 o PE3) y "subtema" en cada pregunta
-- DIFICULTAD OBLIGATORIA: 100% altas. 0% medias, 0% fáciles. Marca cada una en "dificultad": "alta".
-- PROHIBIDO: preguntas de un solo paso, cálculo directo (ej. "¿Cuánto es 2+2?"), definiciones de memoria ("¿Qué es...?"), textos de menos de 80 palabras en comprensión lectora, sucesiones aritméticas obvias.
-- APLICACIÓN DIRECTA PROHIBIDA: si se resuelve con una sola fórmula o una sola observación, NO es alta. Ejemplos de nivel MEDIO que debes ELEVAR (no los copies, úsalos como piso mínimo):
-  * "Si log2(x) + log2(x-2) = 3, halle x^2 - 2x" → MEDIO (colapsa en una observación). Versión ALTA: agrega parámetro k, condición de existencia y descarte de raíces extrañas, o combina con inecuación.
-  * "Triángulo rectángulo de hipotenusa 13 y cateto 5, halle sen(2θ)" → MEDIO (fórmula directa sobre terna notable). Versión ALTA: el triángulo debe deducirse de una condición previa (semejanza, área dada, trazo auxiliar) antes de aplicar ángulo doble.
-  Regla de oro: el estudiante debe ATASCARSE al menos una vez y necesitar un insight intermedio (despeje no obvio, trazo auxiliar, cambio de variable, descarte de casos, interpretación de un dato oculto).
-- Cada pregunta "alta" DEBE exigir 2 o más conceptos combinados y tener al menos 3 pasos de resolución (lista los pasos en "pasos"). Si no llega a 3 pasos, no es alta: elévala.
-- Distractores trampa: cada distractor debe corresponder a un ERROR TÍPICO real (signo cambiado, fórmula a medias, lectura parcial del texto, confundir área con perímetro, olvidar el reactivo limitante, etc.).
-- Números no triviales: evita resultados enteros obvios; usa fracciones, radicales y decimales como el examen real.
-- Por área, exige esto:
-  * Aritmética/Álgebra: combina 2 temas (ej. divisibilidad + ecuaciones; funciones + desigualdades).
-  * Geometría/Trigonometría: exige trazo auxiliar, semejanza o identidad no inmediata.
-  * Física: combina 2 principios (ej. dinámica + trabajo-energía; hidrostática + empuje con densidades compuestas).
-  * Química: estequiometría con reactivo limitante o impurezas; nada de preguntas de completar la tabla periódica.
-  * Razonamiento Matemático: juegos lógicos de 4+ condiciones o conteo con casos múltiples, no series de +2.
-  * Razonamiento Verbal: textos densos de 150+ palabras con inferencia (nada literal), analogías de 2do orden.
-  * Humanidades: pregunta relacional (causa-efecto, compara autores/hechos), no fechas sueltas de memoria.
-- ANCLAS DE NIVEL (iguala o supera esta dificultad):
-  * Álgebra: "Si x + 1/x = 4, calcule x^4 + 1/x^4" (exige ver el cuadrado iterado, no reemplazo directo).
-  * Geometría: hallar un área sombreada que obliga a restar sectores y usar semejanza antes de operar.
-  * Física: un bloque que desliza por un plano inclinado con fricción y luego comprime un resorte: pide la compresión máxima (dinámica + energía + condición de equilibrio).
+${REGLAS_NIVEL}
+${REGLAS_CLAVE}
 - SI HAY GUÍA DEL ADMINISTRADOR: usa el estilo y nivel de dificultad como referencia
-- NO repitas conceptos entre preguntas
-- CADA PREGUNTA DEBE SER ÚNICA: varía datos numéricos, contextos y enfoques aunque el subtema se repita`;
+- BASADO EN EL MATERIAL: si el administrador proporcionó contenido del examen/material, esos temas son tu FUENTE PRINCIPAL: genera preguntas que los cubran con el MISMO estilo, pero exigiendo el nivel máximo`;
   } else {
     config = { count: numQuestions, prompt: "" };
     systemPrompt = `Eres un psicólogo vocacional experto en evaluación psicométrica. Genera un test vocacional basado en los criterios de evaluación más importantes del mundo.
@@ -477,14 +599,22 @@ REGLAS:
 
   if (batchSection) {
     config.count = numQuestions;
-    systemPrompt = `Eres un experto creador de exámenes de admisión IEN UNI. Genera EXACTAMENTE ${numQuestions} preguntas nuevas únicamente sobre esta sección: ${batchSection}
+    systemPrompt = `Eres un experto creador de exámenes de admisión IEN UNI (nivel máximo, Perú). Genera EXACTAMENTE ${numQuestions} preguntas nuevas únicamente sobre esta sección: ${batchSection}
 
-Usa los materiales de referencia como guía de estilo y nivel. Cada pregunta debe tener cinco opciones (A-E), una respuesta correcta con índice de 0 a 4, dificultad "alta", al menos tres pasos de resolución y una explicación breve. Combina conceptos, evita preguntas de memoria o de aplicación directa, y asegúrate de que las opciones incorrectas sean distractores plausibles. El campo "area" debe ser PE1 para Aptitud Académica, PE2 para Matemática/Física/Química o PE3 para Humanidades de Conocimientos.
+MATERIAL/GUÍA DEL ADMINISTRADOR (FUENTE PRINCIPAL):
+${context || "No hay material disponible. Genera con tu conocimiento del examen IEN UNI."}
+${context ? "\nCubre los temas de este material con preguntas del MISMO estilo y estructura, pero exigiendo el nivel máximo del examen real (usa el material como guía de estilo, NO copies sus preguntas literalmente)." : ""}
 
-${context ? `MATERIALES DE REFERENCIA:\n${context}\n\n` : ""}Responde únicamente con JSON válido, sin markdown:
+REGLAS DE ESTA SECCIÓN: cinco opciones (A-E); incluye "area" (PE1 para Aptitud Académica, PE2 para Matemática/Física/Química, PE3 para Humanidades de Conocimientos) y "subtema" en cada pregunta. Responde únicamente con JSON válido, sin markdown:
 {"preguntas":[{"texto":"...","opciones":["A) ...","B) ...","C) ...","D) ...","E) ..."],"respuestaCorrecta":0,"area":"PE1/PE2/PE3","subtema":"...","dificultad":"alta","pasos":["...","...","..."],"explicacion":"..."}]}
 
-No generes preguntas de otras secciones.`;
+No generes preguntas de otras secciones.
+
+REGLAS DE NIVEL (obligatorias):
+${REGLAS_NIVEL}
+
+REGLAS DE LA CLAVE DE RESPUESTA (obligatorias):
+${REGLAS_CLAVE}`;
   }
 
   try {
@@ -496,32 +626,45 @@ No generes preguntas de otras secciones.`;
       const lote = await llamarIA(API_KEY, systemPrompt, topic, objetivo, context, []);
       if (!lote) return res.status(502).json({ error: "Invalid response format from AI" });
       const bancoVacio = { hashes: new Set(), entradas: [], normas: [] };
-      const { nuevas } = filtrarLote(lote, bancoVacio, []);
+      const { nuevas } = filtrarLote(lote, bancoVacio, [], false);
       const limpias = nuevas.map(({ texto_norm, hash, optsHash, nums, ...q }) => q);
       return res.status(200).json({ preguntas: limpias });
     }
 
-    // --- Ruta simulacro: banco + exclusiones + reintento ---
+    // --- Ruta simulacro: banco + exclusiones + validación de clave + reintento ---
     const banco = await cargarBanco(universidad);
     const acumuladas = [];
     let repetidasTotal = 0;
+    let invalidasTotal = 0;
 
     for (let intento = 0; intento < MAX_INTENTOS && acumuladas.length < objetivo; intento++) {
       const exclusionStems = [
         ...banco.normas.slice(-30),
         ...acumuladas.map((a) => a.texto_norm),
       ].map((t) => String(t).slice(0, 120));
-      const lote = await llamarIA(API_KEY, systemPrompt, topic, objetivo, context, exclusionStems);
+      const lote = await llamarIA(
+        API_KEY,
+        systemPrompt,
+        topic,
+        objetivo - acumuladas.length,
+        context,
+        exclusionStems
+      );
       if (!lote) break;
-      const { nuevas, repetidas } = filtrarLote(lote, banco, excludeNorms);
+      const { nuevas, repetidas, invalidas } = filtrarLote(lote, banco, excludeNorms, true);
       repetidasTotal += repetidas;
+      invalidasTotal += invalidas;
       acumuladas.push(...nuevas);
       // el banco en memoria ya se actualizó dentro de filtrarLote
       banco.normas.push(...nuevas.map((n) => n.texto_norm));
     }
 
     if (!acumuladas.length) {
-      return res.status(502).json({ error: "Could not parse AI response" });
+      return res.status(502).json({
+        error: invalidasTotal
+          ? `La IA devolvió ${invalidasTotal} pregunta(s) sin clave de respuesta válida y ninguna pasó la validación`
+          : "Could not parse AI response",
+      });
     }
 
     // --- Refuerzo de nivel: si menos del 85% salió alta, tanda extra SOLO altas ---
@@ -540,7 +683,7 @@ No generes preguntas de otras secciones.`;
             [...banco.normas.slice(-30), ...final.map((a) => a.texto_norm)].map((t) => String(t).slice(0, 120))
           );
           if (loteNivel) {
-            const { nuevas: _nl } = filtrarLote(loteNivel, banco, excludeNorms);
+            const { nuevas: _nl } = filtrarLote(loteNivel, banco, excludeNorms, true);
             const nuevas = auditarNivel(_nl);
             const altasNuevas = nuevas.filter((q) => (q.dificultad || "alta") === "alta");
             let k = 0;
@@ -553,15 +696,35 @@ No generes preguntas de otras secciones.`;
       }
     }
 
-    await guardarBanco(universidad, acumuladas);
+    // --- AUDITORÍA DE CLAVES CON IA: resuelve cada pregunta, corrige
+    //     claves equivocadas y elimina preguntas defectuosas ---
+    let auditoria = null;
+    if (final.length) {
+      try {
+        const resAudit = await auditarClaves(API_KEY, final);
+        if (resAudit && resAudit.preguntas.length) {
+          final = resAudit.preguntas;
+          auditoria = {
+            auditadas: resAudit.auditadas,
+            corregidas: resAudit.corregidas,
+            descartadas: resAudit.descartadas,
+          };
+        }
+      } catch {} // si la auditoría falla, se conservan las preguntas tal cual
+    }
 
-    const limpias = final.map(({ texto_norm, hash, optsHash, nums, ...q }) => q);
+    // Se guarda solo lo que se devuelve (con la clave ya auditada)
+    await guardarBanco(universidad, final);
+
+    const limpias = final.map(({ texto_norm, hash, optsHash, nums, _degradada, ...q }) => q);
     const nAltas = cuentaAltas(limpias);
     return res.status(200).json({
       preguntas: limpias,
       total: limpias.length,
       solicitadas: objetivo,
       repetidas_filtradas: repetidasTotal,
+      invalidas_filtradas: invalidasTotal,
+      auditoria,
       nivel: { altas: nAltas, medias: limpias.length - nAltas, pct_altas: Math.round((nAltas / Math.max(1, limpias.length)) * 100) },
     });
   } catch (error) {

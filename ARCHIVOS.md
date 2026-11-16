@@ -28,7 +28,7 @@
 
 | Archivo | Descripción |
 |---------|-------------|
-| `api/generate-questions.js` | Preguntas de simulacro con anti-repetición y nivel 100% difícil |
+| `api/generate-questions.js` | Preguntas de simulacro con anti-repetición, nivel máximo, **validación de clave de respuesta** (entero 0-4, 5 opciones A-E) y **auditoría con IA** que corrige/elimina claves malas |
 | `api/generate-guide.js` | Guía de aprendizaje personalizada con IA |
 | `api/tutor.js` | Tutor adaptativo: explicar, practicar, socrático, errores, pista escalonada (1-2-3) y corrección de procedimiento |
 | `api/clone-problem.js` | Clonador infinito de problemas (varía datos, conserva estructura; tabla `pregunta_clones`) |
@@ -47,6 +47,14 @@
 | `agents/run-collect.js` | CLI: `npm run agents:collect -- --uni=UNI --save` |
 | `agents/seed-contenido.js` | Semilla de temarios/materiales (requiere `SUPABASE_SERVICE_KEY`) |
 | `agents/backfill-banco.js` | Rellena hashes del banco de preguntas |
+
+## Scripts de mantenimiento (`scripts/`)
+
+| Archivo | Descripción |
+|---------|-------------|
+| `scripts/verify-simulacros.js` | Verifica que toda pregunta de simulacro tenga clave de respuesta válida. Con `--repair` elimina las inválidas |
+| `scripts/extract-material-text.js` | Extrae el texto de los PDFs subidos a `contenido_texto` para que la IA genere basándose en el material. Con `--dry-run` solo muestra |
+| `scripts/regenerate-simulacro.js` | Regenera las 65 preguntas de un simulacro (material como fuente, máximo nivel, claves auditadas). Aborta si ya hay envíos salvo `--force` |
 
 ## CSS
 
