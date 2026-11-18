@@ -1707,15 +1707,47 @@
                 localStorage.setItem("area52_res_" + (simulacroCurrentTest.id || "adhoc"), JSON.stringify({ answers: window.simulacroAnswers, elapsed: elapsed, estrategia: state.estrategia || null }));
             } catch (e) {}
 
+            // ID único persistente para alumnos sin sesión (evita pisarse con "anonimo")
+            if (email === "anonimo") {
+                let anonId = localStorage.getItem("area52_anon_id");
+                if (!anonId) {
+                    anonId = "anon-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+                    localStorage.setItem("area52_anon_id", anonId);
+                }
+                payload.estudiante_email = anonId + "@anon.area52";
+            }
+
             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
             if (isScheduled) await sleep(Math.random() * 4000);
-            for (let attempt = 0; attempt < 4; attempt++) {
+
+            // Guardar con reintentos + indicador de éxito/fallo
+            let saveOk = false;
+            let saveError = null;
+            for (let attempt = 0; attempt < 5; attempt++) {
                 try {
                     const { error } = await supabase.from("simulacro_submissions").upsert(payload, { onConflict: "simulacro_id,estudiante_email" });
-                    if (!error) break;
-                } catch (e) {}
+                    if (!error) { saveOk = true; saveError = null; break; }
+                    saveError = error.message || JSON.stringify(error);
+                } catch (e) { saveError = e.message; }
                 await sleep(1000 * Math.pow(2, attempt));
             }
+
+            // Fallback: si Supabase falló, intentar guardar vía API del servidor
+            if (!saveOk) {
+                try {
+                    const r = await fetch("/api/guardar-submission", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    if (r.ok) { saveOk = true; saveError = null; }
+                } catch (e) {}
+            }
+
+            // Guardar estado del guardado para mostrar al alumno
+            window._saveStatus = saveOk ? "ok" : "fail";
+            try {
+                localStorage.setItem("area52_save_" + (simulacroCurrentTest.id || "adhoc"), JSON.stringify({ ok: saveOk, at: Date.now(), error: saveError }));
+            } catch (e) {}
 
             // Anti-repetición: registrar qué preguntas vio (no bloquea el resultado)
             try {
@@ -1750,14 +1782,38 @@
 
             // Si el examen programado aun no termina, ocultar nota, orden de merito y solucionario
             if (isScheduled && Date.now() < examEnd) {
+                const areaLocked = document.getElementById("simulacro-test-area");
+                areaLocked.innerHTML = buildSaveStatusBanner() + areaLocked.innerHTML;
                 renderResultsLocked(examEnd, state, simulacroCurrentTest.id);
+                const area2 = document.getElementById("simulacro-test-area");
+                if (area2 && !area2.innerHTML.includes("save-status-banner")) {
+                    area2.insertAdjacentHTML("afterbegin", buildSaveStatusBanner());
+                }
                 return;
             }
 
             const lb = await fetchSimulacroLeaderboard(simulacroCurrentTest.id, email);
             window._ultimoResultado = { state, simId: simulacroCurrentTest.id || null, titulo: simulacroCurrentTest.titulo || "Simulacro" };
-            document.getElementById("simulacro-test-area").innerHTML = buildResultsPageHTML(state, lb, email);
+            document.getElementById("simulacro-test-area").innerHTML = buildSaveStatusBanner() + buildResultsPageHTML(state, lb, email);
         };
+
+        // Banner que avisa al alumno si su envío se guardó correctamente
+        function buildSaveStatusBanner() {
+            const st = window._saveStatus;
+            if (st === "ok") {
+                return `<div id="save-status-banner" style="background:#d4edda; border:1px solid #c3e6cb; color:#155724; padding:0.7rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.9rem; text-align:center;">
+                    ✅ <strong>Tu envío se guardó correctamente.</strong> Tu nota quedó registrada.
+                </div>`;
+            }
+            if (st === "fail") {
+                return `<div id="save-status-banner" style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:0.7rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.9rem; text-align:center;">
+                    ⚠️ <strong>No pudimos guardar tu envío en el servidor</strong> (problema de conexión).<br>
+                    Tu nota se muestra aquí, pero <strong>podría no aparecer en el ranking del profesor</strong>.<br>
+                    <span style="font-size:0.82rem;">Intenta abrir esta página de nuevo en unos minutos para reintentar el guardado, o avisa a tu profesor con una captura de pantalla.</span>
+                </div>`;
+            }
+            return "";
+        }
 
         // === MI AVANCE: dashboard del postulante ===
         let _avanceCountdownInt = null;
