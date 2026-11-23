@@ -137,6 +137,8 @@ function instruccionPista(n) {
   return `PISTA ESCALONADA (nivel actual ${nivel}/3): ${niveles[nivel]}`;
 }
 
+const ai = require("./_ai");
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -148,9 +150,9 @@ module.exports = async function handler(req, res) {
   const { mensaje, historial } = body;
   if (!mensaje || !String(mensaje).trim()) return res.status(400).json({ error: "Falta mensaje" });
 
-  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
-  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
-  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
+  const API_KEY = ai.key();
+  const AI_MODEL = ai.model();
+  const AI_URL = ai.url();
   if (!API_KEY) return res.status(500).json({ error: "API key not configured" });
 
   const email = (body.estudiante_email || "").trim() || "anonimo";
@@ -194,12 +196,7 @@ REGLAS:
   try {
     const r = await fetch(AI_URL, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
-        "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
-      },
+      headers: { ...ai.headers(), Authorization: `Bearer ${API_KEY}` },
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [

@@ -16,6 +16,7 @@
 // nuevas ni son filtrados por similitud).
 // ============================================================
 const crypto = require("crypto");
+const ai = require("./_ai");
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://tnqjjydmlruzcxlzeurt.supabase.co";
 const SUPABASE_ANON =
@@ -136,16 +137,11 @@ FORMATO JSON VÁLIDO (sin markdown, sin backticks):
 ${original}
 
 Genera ${cantidad} clon(es) del problema con datos nuevos y distintos a los originales.${exclusion ? `\n\nPROHIBIDO (clones ya existentes, no los repitas ni reescrituras):${exclusion}` : ""}`;
-  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
-  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
+  const AI_MODEL = ai.model();
+  const AI_URL = ai.url();
   const r = await fetch(AI_URL, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
-      "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
-    },
+    headers: { ...ai.headers(), Authorization: `Bearer ${API_KEY}` },
     body: JSON.stringify({
       model: AI_MODEL,
       messages: [
@@ -182,7 +178,7 @@ module.exports = async function handler(req, res) {
   if (!original) return res.status(400).json({ error: "Falta el problema original" });
   if (original.length < 15) return res.status(400).json({ error: "Problema demasiado corto para clonar" });
 
-  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const API_KEY = ai.key();
   if (!API_KEY) return res.status(500).json({ error: "API key not configured" });
 
   const universidad = (body.universidad || "UNI").trim() || "UNI";

@@ -35,10 +35,18 @@ vercel
 
 ## Variables de Entorno en Vercel
 
-Configura tu API key de OpenRouter (y opcionalmente el modelo):
+Configura el proveedor de IA (Opción A, recomendada — DeepSeek con créditos):
 ```
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=sk-...                  # de https://platform.deepseek.com → API Keys
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+Opción B — modelos gratuitos de OpenRouter:
+```
+AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=tu_api_key_de_openrouter
-OPENROUTER_MODEL=deepseek/deepseek-chat
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
 Las credenciales de Supabase están en `public/js/supabase-config.js`.

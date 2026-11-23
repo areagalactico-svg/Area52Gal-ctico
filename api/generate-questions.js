@@ -15,6 +15,7 @@
 // - Otros types (vocacional): validación ligera + dedup en el lote.
 // ============================================================
 const crypto = require("crypto");
+const ai = require("./_ai");
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://tnqjjydmlruzcxlzeurt.supabase.co";
 const SUPABASE_ANON =
@@ -282,39 +283,243 @@ async function guardarBanco(universidad, nuevas) {
   } catch {} // si falla el guardado, igual se devuelven las preguntas
 }
 
-// Llamada genérica a la IA que devuelve el JSON parseado (o null).
-async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
-  const { temperature = 0.9, maxTokens } = opts;
-  const AI_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat";
-  const AI_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
-  const response = await fetch(AI_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://area52uni.com",
-      "X-Title": process.env.OPENROUTER_SITE_NAME || "Area 52 UNI",
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: maxTokens,
-      temperature,
-    }),
-  });
-  if (!response.ok) return null;
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return null;
+// ------------------------------------------------------------
+// CADENA DE MODELOS GRATUITOS (:free). El principal es
+// OPENROUTER_MODEL; si falla (límite diario, 429, JSON inválido)
+// se intenta con los respaldos de OPENROUTER_MODELS. Así la
+// generación no se cae cuando un modelo gratis se agota.
+// ------------------------------------------------------------
+function cadenaModelos() {
+  // DeepSeek oficial: un solo modelo (créditos pagos → sin carrera
+  // paralela, cada llamada extra costaría dinero).
+  if (ai.esDeepSeek()) return [ai.model()];
+  const principal = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
+  const respaldo = (
+    process.env.OPENROUTER_MODELS ||
+    "nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,nvidia/nemotron-3.5-super-vl:free,nvidia/nemotron-3.5-lightning:free,baidu/ernie-5.5-flash-preview:free,recursive/flint-v1.0:free,particle-ai/particle-1:free"
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [principal, ...respaldo.filter((m) => m !== principal)];
+}
+
+// Cierra estructuras abiertas y limpia restos a media clave/valor.
+function cerrarEstructuras(t) {
+  const stack = [];
+  let enString = false;
+  let escape = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (enString) {
+      if (escape) escape = false;
+      else if (c === "\\") escape = true;
+      else if (c === '"') enString = false;
+      continue;
+    }
+    if (c === '"') enString = true;
+    else if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") stack.pop();
   }
+  const limpio = t
+    .replace(/,\s*$/, "")
+    .replace(/,\s*"[^"]*"\s*:\s*$/, "")
+    .replace(/"[^"]*"\s*:\s*$/, "")
+    .replace(/:\s*$/, "")
+    .replace(/,\s*$/, "");
+  const cierres = stack
+    .slice()
+    .reverse()
+    .map((x) => (x === "{" ? "}" : "]"))
+    .join("");
+  return limpio + cierres;
+}
+
+// Repara respuestas TRUNCADAS (max_tokens alcanzado): recorta en el
+// último cierre de llave/corchete fuera de cadenas y cierra lo que
+// falte. Conserva todas las preguntas completas y descarta solo la
+// última a media escribir.
+function repararTruncado(s) {
+  const inicio = s.indexOf("{");
+  if (inicio < 0) return null;
+  s = s.slice(inicio);
+  let enString = false;
+  let escape = false;
+  let ultimo = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (enString) {
+      if (escape) escape = false;
+      else if (c === "\\") escape = true;
+      else if (c === '"') enString = false;
+      continue;
+    }
+    if (c === '"') enString = true;
+    else if (c === "}" || c === "]") ultimo = i;
+  }
+  if (ultimo < 0) return null;
+  return cerrarEstructuras(s.slice(0, ultimo + 1));
+}
+
+// Extracción tolerante del JSON de la IA: quita markdown/backticks,
+// balancea llaves, repara recortes y, como último recurso, usa el
+// bloque greedy antiguo.
+function extraerJSON(content) {
+  if (!content || typeof content !== "string") return null;
+  let s = content.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1];
+
+  // 1) objeto {...} balanceado (respuesta completa, aunque haya texto alrededor)
+  const inicio = s.indexOf("{");
+  if (inicio >= 0) {
+    let depth = 0;
+    let fin = -1;
+    let enString = false;
+    let escape = false;
+    for (let i = inicio; i < s.length; i++) {
+      const c = s[i];
+      if (enString) {
+        if (escape) escape = false;
+        else if (c === "\\") escape = true;
+        else if (c === '"') enString = false;
+        continue;
+      }
+      if (c === '"') enString = true;
+      else if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) {
+          fin = i;
+          break;
+        }
+      }
+    }
+    if (fin >= 0) {
+      try {
+        return JSON.parse(s.slice(inicio, fin + 1));
+      } catch {}
+    }
+  }
+
+  // 2) recortado → reparar conservando las preguntas completas
+  const reparado = repararTruncado(s);
+  if (reparado) {
+    try {
+      return JSON.parse(reparado);
+    } catch {}
+  }
+
+  // 3) último recurso (comportamiento original)
+  const greedy = s.match(/\{[\s\S]*\}/);
+  if (greedy) {
+    try {
+      return JSON.parse(greedy[0]);
+    } catch {}
+  }
+  return null;
+}
+
+// Llamada genérica a la IA que devuelve el JSON parseado (o null).
+//
+// Los modelos ":free" de OpenRouter son inestables: a veces responden en
+// segundos, a veces 429 (límite), a veces se quedan "pensando" minutos o
+// devuelven contenido vacío. Por eso se usa una CARRERA ESCALONADA:
+//   - se lanza el primer modelo y, si en OPENROUTER_STAGGER_MS no ha
+//     respondido, se lanza el siguiente en paralelo;
+//   - si uno falla rápido (429, vacío) se lanza el siguiente al instante;
+//   - gana el primero que devuelva JSON válido y el resto se cancela.
+async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
+  const { temperature = 0.9, maxTokens = 16384 } = opts;
+  const AI_URL = ai.url();
+  // Parámetros extra del proveedor: en OpenRouter el esfuerzo de
+  // razonamiento (los gratis "piensan" tanto que devuelven vacío);
+  // en DeepSeek no se envía ninguno.
+  const extra = ai.extraBody();
+  const tope = ai.topeMaxTokens();
+  const presupuestoMs = Number(process.env.OPENROUTER_TIMEOUT_MS || 240000);
+  const staggerMs = Number(process.env.OPENROUTER_STAGGER_MS || 25000);
+  const limite = Date.now() + presupuestoMs;
+  const abort = new AbortController(); // cancela el resto al haber ganador
+
+  let mejor = null;
+
+  const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const intentarModelo = async (modelo, mt) => {
+    if (mejor || Date.now() >= limite) return;
+    const restante = limite - Date.now();
+    const local = new AbortController();
+    const cancelar = () => local.abort();
+    abort.signal.addEventListener("abort", cancelar, { once: true });
+    const timer = setTimeout(() => local.abort(), Math.min(150000, restante));
+    try {
+      const response = await fetch(AI_URL, {
+        method: "POST",
+        // sin timeout una petición al proveedor puede colgar el request entero
+        signal: local.signal,
+        headers: { ...ai.headers(), Authorization: `Bearer ${API_KEY}` },
+        body: JSON.stringify({
+          model: modelo,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: Math.min(mt, tope),
+          temperature,
+          ...extra,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error(`[IA] ${modelo} (max_tokens=${mt}): HTTP ${response.status} ${errText.slice(0, 300)}`);
+        return;
+      }
+      const data = await response.json().catch(() => null);
+      const content = data?.choices?.[0]?.message?.content || "";
+      const parsed = extraerJSON(content);
+      if (parsed) {
+        mejor = parsed;
+        abort.abort(); // ya hay ganador → se cancelan los demás
+        console.error(`[IA] ${modelo}: OK (${Date.now() - (limite - restante)}ms, max_tokens=${mt})`);
+        return;
+      }
+      const finish = data?.choices?.[0]?.finish_reason;
+      console.error(
+        `[IA] ${modelo} (max_tokens=${mt}): sin JSON válido (finish=${finish}) → ${
+          content.slice(0, 200) || "contenido vacío; respuesta=" + JSON.stringify(data).slice(0, 200)
+        }`
+      );
+    } catch (e) {
+      if (!abort.signal.aborted) {
+        console.error(`[IA] ${modelo}: error de red/timeout → ${e.name}: ${e.message}`);
+      }
+    } finally {
+      clearTimeout(timer);
+      abort.signal.removeEventListener("abort", cancelar);
+    }
+  };
+
+  const modelos = cadenaModelos();
+  const enVuelo = [];
+  for (let i = 0; i < modelos.length && !mejor && Date.now() < limite; i++) {
+    const modelo = modelos[i];
+    const tarea = intentarModelo(modelo, maxTokens).finally(() => {
+      const p = enVuelo.indexOf(tarea);
+      if (p >= 0) enVuelo.splice(p, 1);
+    });
+    enVuelo.push(tarea);
+    // Espera: si falla rápido se lanza el siguiente ya; si sigue
+    // trabajando pasados staggerMs, se solapa con el siguiente modelo.
+    const esperar = staggerMs;
+    const inicio = Date.now();
+    while (!mejor && Date.now() - inicio < esperar && enVuelo.length) {
+      await Promise.race([dormir(Math.min(2000, esperar)), ...enVuelo.slice()]);
+      if (enVuelo.indexOf(tarea) < 0) break; // terminó (falló rápido)
+    }
+  }
+  await Promise.allSettled(enVuelo.slice());
+  return mejor;
 }
 
 async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems) {
@@ -325,7 +530,7 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
     API_KEY,
     systemPrompt,
     `Genera las ${n} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? "IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas." : ""}${exclusion}`,
-    { maxTokens: Math.min(8192, Math.max(2048, n * 1000)) }
+    { maxTokens: ai.maxTokensPara(n) }
   );
   if (!parsed || !Array.isArray(parsed.preguntas)) return null;
   return parsed.preguntas;
@@ -358,7 +563,10 @@ REGLAS:
       lote.map((q, k) => ({ i: k, texto: q.texto, opciones: q.opciones, respuestaCorrecta: q.respuestaCorrecta }))
     );
     try {
-      const parsed = await pedirJSON(API_KEY, sistema, user, { temperature: 0.2, maxTokens: 4096 });
+      const parsed = await pedirJSON(API_KEY, sistema, user, {
+        temperature: 0.2,
+        maxTokens: Math.min(16384, ai.topeMaxTokens()),
+      });
       const arr = parsed && Array.isArray(parsed.verificaciones) ? parsed.verificaciones : null;
       if (!arr) continue; // tanda no auditable → se conserva sin cambios
       for (const v of arr) {
@@ -448,7 +656,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: "Invalid simulacro batch section" });
   }
 
-  const API_KEY = process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const API_KEY = ai.key();
 
   if (!API_KEY) {
     return res.status(500).json({ error: "API key not configured" });
@@ -650,13 +858,19 @@ ${REGLAS_CLAVE}`;
         context,
         exclusionStems
       );
-      if (!lote) break;
+      if (!lote) {
+        console.error(`[SIM] intento ${intento + 1}: la IA no devolvió JSON válido → se corta`);
+        break;
+      }
       const { nuevas, repetidas, invalidas } = filtrarLote(lote, banco, excludeNorms, true);
       repetidasTotal += repetidas;
       invalidasTotal += invalidas;
       acumuladas.push(...nuevas);
       // el banco en memoria ya se actualizó dentro de filtrarLote
       banco.normas.push(...nuevas.map((n) => n.texto_norm));
+      console.error(
+        `[SIM] intento ${intento + 1}: ${acumuladas.length}/${objetivo} nuevas (repetidas=${repetidas}, inválidas=${invalidas})`
+      );
     }
 
     if (!acumuladas.length) {
@@ -701,6 +915,7 @@ ${REGLAS_CLAVE}`;
     let auditoria = null;
     if (final.length) {
       try {
+        console.error(`[SIM] auditoría de claves sobre ${final.length} pregunta(s)...`);
         const resAudit = await auditarClaves(API_KEY, final);
         if (resAudit && resAudit.preguntas.length) {
           final = resAudit.preguntas;
@@ -732,3 +947,9 @@ ${REGLAS_CLAVE}`;
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// Exuestos solo para pruebas del parser de respuestas de IA
+module.exports.extraerJSON = extraerJSON;
+module.exports.cadenaModelos = cadenaModelos;
+module.exports.REGLAS_NIVEL = REGLAS_NIVEL;
+module.exports.REGLAS_CLAVE = REGLAS_CLAVE;

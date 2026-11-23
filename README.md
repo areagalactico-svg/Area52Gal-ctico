@@ -40,7 +40,7 @@ area52-uni/
 
 - **Frontend**: HTML, CSS, JavaScript vanilla
 - **Backend**: Supabase (PostgreSQL, Auth, Storage)
-- **IA**: OpenRouter API (`deepseek/deepseek-chat` por defecto) para generación de preguntas, tutor y chatbot
+- **IA**: DeepSeek API oficial (`deepseek-chat`) para generación de preguntas, tutor y chatbot; con `AI_PROVIDER=openrouter` se cambia a los modelos **gratuitos** `:free` de OpenRouter (ver `api/_ai.js`)
 - **Hosting**: Vercel
 - **Chatbot**: WhatsApp widget
 
@@ -48,10 +48,18 @@ area52-uni/
 
 Las credenciales de Supabase están en `public/js/supabase-config.js` (expuestas al cliente, son públicas por diseño de Supabase).
 
-En Vercel configura:
+En Vercel configura (Opción A, recomendada — DeepSeek con créditos propios):
 ```
-OPENROUTER_API_KEY=sk-or-v1-...          # API Key de OpenRouter
-OPENROUTER_MODEL=deepseek/deepseek-chat  # (Opcional) Modelo de OpenRouter a usar
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=sk-...                  # https://platform.deepseek.com → API Keys
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+Opción B — modelos gratuitos de OpenRouter (sin créditos):
+```
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
 ## Deployment
