@@ -125,7 +125,10 @@ async function cargarBanco(universidad) {
   const vacio = { hashes: new Set(), entradas: [], normas: [] };
   try {
     const u = `${SUPABASE_URL}/rest/v1/banco_preguntas?select=hash,texto_norm,opciones_hash,numeros&universidad=eq.${encodeURIComponent(universidad)}&order=created_at.desc&limit=1000`;
-    const r = await fetch(u, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } });
+    const r = await fetch(u, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+      signal: AbortSignal.timeout(15000),
+    });
     if (!r.ok) return vacio; // tabla aún no creada → sin filtro (no rompe nada)
     const rows = await r.json();
     const entradas = (rows || []).filter((x) => x.texto_norm).map((x) => ({
@@ -279,6 +282,7 @@ async function guardarBanco(universidad, nuevas) {
         Prefer: "resolution=merge-duplicates,return=minimal",
       },
       body: JSON.stringify(filas),
+      signal: AbortSignal.timeout(15000),
     });
   } catch {} // si falla el guardado, igual se devuelven las preguntas
 }
@@ -430,16 +434,19 @@ function extraerJSON(content) {
 //   - si uno falla rápido (429, vacío) se lanza el siguiente al instante;
 //   - gana el primero que devuelva JSON válido y el resto se cancela.
 async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
-  const { temperature = 0.9, maxTokens = 16384 } = opts;
+  const { temperature = 0.9, maxTokens = 16384, deadline } = opts;
   const AI_URL = ai.url();
   // Parámetros extra del proveedor: en OpenRouter el esfuerzo de
   // razonamiento (los gratis "piensan" tanto que devuelven vacío);
   // en DeepSeek no se envía ninguno.
   const extra = ai.extraBody();
   const tope = ai.topeMaxTokens();
-  const presupuestoMs = Number(process.env.OPENROUTER_TIMEOUT_MS || 240000);
+  // Presupuesto de ESTA llamada (y tope máximo que indique el handler:
+  // Vercel corta la función a los 300s, hay que responder antes).
+  const presupuestoMs = Number(process.env.OPENROUTER_TIMEOUT_MS || 120000);
   const staggerMs = Number(process.env.OPENROUTER_STAGGER_MS || 25000);
-  const limite = Date.now() + presupuestoMs;
+  const limite = Math.min(Date.now() + presupuestoMs, deadline || Infinity);
+  if (limite - Date.now() < 5000) return null; // sin tiempo suficiente
   const abort = new AbortController(); // cancela el resto al haber ganador
 
   let mejor = null;
@@ -452,7 +459,7 @@ async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
     const local = new AbortController();
     const cancelar = () => local.abort();
     abort.signal.addEventListener("abort", cancelar, { once: true });
-    const timer = setTimeout(() => local.abort(), Math.min(150000, restante));
+    const timer = setTimeout(() => local.abort(), Math.min(120000, restante));
     try {
       const response = await fetch(AI_URL, {
         method: "POST",
@@ -522,7 +529,7 @@ async function pedirJSON(API_KEY, systemPrompt, userPrompt, opts = {}) {
   return mejor;
 }
 
-async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems) {
+async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems, deadline) {
   const exclusion = exclusionStems.length
     ? `\n\nPREGUNTAS PROHIBIDAS (ya existen en el banco o el estudiante ya las vio — NO generes ninguna igual ni reescrita con otras palabras):\n${exclusionStems.map((s) => `- ${s}`).join("\n")}`
     : "";
@@ -530,7 +537,7 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
     API_KEY,
     systemPrompt,
     `Genera las ${n} preguntas del "${topic}" para el examen IEN de la UNI. ${context ? "IMPORTANTE: Usa los materiales de referencia del administrador como guía para el estilo, dificultad y tipo de preguntas." : ""}${exclusion}`,
-    { maxTokens: ai.maxTokensPara(n) }
+    { maxTokens: ai.maxTokensPara(n), deadline }
   );
   if (!parsed || !Array.isArray(parsed.preguntas)) return null;
   return parsed.preguntas;
@@ -543,7 +550,7 @@ async function llamarIA(API_KEY, systemPrompt, topic, n, context, exclusionStems
 // defectuosas (sin respuesta única). Si la auditoría no responde,
 // se conservan las preguntas tal cual (no rompe la generación).
 // ------------------------------------------------------------
-async function auditarClaves(API_KEY, preguntas) {
+async function auditarClaves(API_KEY, preguntas, deadline) {
   const TAM = 10;
   const verifs = new Map();
   for (let i = 0; i < preguntas.length; i += TAM) {
@@ -566,6 +573,7 @@ REGLAS:
       const parsed = await pedirJSON(API_KEY, sistema, user, {
         temperature: 0.2,
         maxTokens: Math.min(16384, ai.topeMaxTokens()),
+        deadline,
       });
       const arr = parsed && Array.isArray(parsed.verificaciones) ? parsed.verificaciones : null;
       if (!arr) continue; // tanda no auditable → se conserva sin cambios
@@ -612,6 +620,18 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Presupuesto TOTAL de tiempo. Vercel corta la función a los 300s
+  // (FUNCTION_INVOCATION_TIMEOUT / HTTP 504): todos los pasos de IA
+  // comparten este límite y se responde con lo que se haya generado
+  // antes de que se agote.
+  const T0 = Date.now();
+  const LIMITE = T0 + Number(process.env.AI_DEADLINE_MS || 245000);
+  const infoIA = () => ({
+    proveedor: ai.esDeepSeek() ? "deepseek" : "openrouter",
+    modelo: ai.model(),
+    tiempo_ms: Date.now() - T0,
+  });
+
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const { topic, type, count, context } = body;
   const batchSectionKey = typeof body.batch_section === "string" ? body.batch_section : "";
@@ -629,14 +649,20 @@ module.exports = async function handler(req, res) {
     if (_email && _email !== "anonimo" && type === "simulacro") {
       const r1 = await fetch(
         `${SUPABASE_URL}/rest/v1/pregunta_vistas?estudiante_email=eq.${encodeURIComponent(_email)}&select=pregunta_id&limit=300`,
-        { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+        {
+          headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+          signal: AbortSignal.timeout(10000),
+        }
       );
       if (r1.ok) {
         const _ids = ((await r1.json()) || []).map((v) => v.pregunta_id).filter(Boolean).slice(0, 300);
         if (_ids.length) {
           const r2 = await fetch(
             `${SUPABASE_URL}/rest/v1/banco_preguntas?universidad=eq.${encodeURIComponent(universidad)}&id=in.(${_ids.join(",")})&select=texto&limit=300`,
-            { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+            {
+              headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+              signal: AbortSignal.timeout(10000),
+            }
           );
           if (r2.ok) {
             for (const b of await r2.json()) {
@@ -831,8 +857,8 @@ ${REGLAS_CLAVE}`;
 
     // --- Ruta vocacional u otros: solo dedup dentro del lote ---
     if (!usarBanco) {
-      const lote = await llamarIA(API_KEY, systemPrompt, topic, objetivo, context, []);
-      if (!lote) return res.status(502).json({ error: "Invalid response format from AI" });
+      const lote = await llamarIA(API_KEY, systemPrompt, topic, objetivo, context, [], LIMITE);
+      if (!lote) return res.status(502).json({ error: "Invalid response format from AI", ia: infoIA() });
       const bancoVacio = { hashes: new Set(), entradas: [], normas: [] };
       const { nuevas } = filtrarLote(lote, bancoVacio, [], false);
       const limpias = nuevas.map(({ texto_norm, hash, optsHash, nums, ...q }) => q);
@@ -846,6 +872,10 @@ ${REGLAS_CLAVE}`;
     let invalidasTotal = 0;
 
     for (let intento = 0; intento < MAX_INTENTOS && acumuladas.length < objetivo; intento++) {
+      if (Date.now() >= LIMITE) {
+        console.error(`[SIM] tiempo agotado antes del intento ${intento + 1}`);
+        break;
+      }
       const exclusionStems = [
         ...banco.normas.slice(-30),
         ...acumuladas.map((a) => a.texto_norm),
@@ -856,7 +886,8 @@ ${REGLAS_CLAVE}`;
         topic,
         objetivo - acumuladas.length,
         context,
-        exclusionStems
+        exclusionStems,
+        LIMITE
       );
       if (!lote) {
         console.error(`[SIM] intento ${intento + 1}: la IA no devolvió JSON válido → se corta`);
@@ -878,13 +909,16 @@ ${REGLAS_CLAVE}`;
         error: invalidasTotal
           ? `La IA devolvió ${invalidasTotal} pregunta(s) sin clave de respuesta válida y ninguna pasó la validación`
           : "Could not parse AI response",
+        ia: infoIA(),
       });
     }
 
     // --- Refuerzo de nivel: si menos del 85% salió alta, tanda extra SOLO altas ---
+    // (paso OPCIONAL: se omite si queda poco tiempo antes del corte de Vercel)
     let final = auditarNivel(acumuladas.slice(0, objetivo));
     const cuentaAltas = (arr) => arr.filter((q) => (q.dificultad || "alta") === "alta").length;
-    if (cuentaAltas(final) / Math.max(1, final.length) < 0.85) {
+    const hayTiempoRefuerzo = Date.now() < LIMITE - 70000;
+    if (hayTiempoRefuerzo && cuentaAltas(final) / Math.max(1, final.length) < 0.85) {
       const faltan = Math.min(objetivo - cuentaAltas(final) + 5, 25);
       if (faltan > 0) {
         try {
@@ -894,7 +928,8 @@ ${REGLAS_CLAVE}`;
             topic,
             faltan,
             context,
-            [...banco.normas.slice(-30), ...final.map((a) => a.texto_norm)].map((t) => String(t).slice(0, 120))
+            [...banco.normas.slice(-30), ...final.map((a) => a.texto_norm)].map((t) => String(t).slice(0, 120)),
+            LIMITE
           );
           if (loteNivel) {
             const { nuevas: _nl } = filtrarLote(loteNivel, banco, excludeNorms, true);
@@ -913,10 +948,10 @@ ${REGLAS_CLAVE}`;
     // --- AUDITORÍA DE CLAVES CON IA: resuelve cada pregunta, corrige
     //     claves equivocadas y elimina preguntas defectuosas ---
     let auditoria = null;
-    if (final.length) {
+    if (final.length && Date.now() < LIMITE - 15000) {
       try {
         console.error(`[SIM] auditoría de claves sobre ${final.length} pregunta(s)...`);
-        const resAudit = await auditarClaves(API_KEY, final);
+        const resAudit = await auditarClaves(API_KEY, final, LIMITE);
         if (resAudit && resAudit.preguntas.length) {
           final = resAudit.preguntas;
           auditoria = {
@@ -940,6 +975,7 @@ ${REGLAS_CLAVE}`;
       repetidas_filtradas: repetidasTotal,
       invalidas_filtradas: invalidasTotal,
       auditoria,
+      ia: infoIA(),
       nivel: { altas: nAltas, medias: limpias.length - nAltas, pct_altas: Math.round((nAltas / Math.max(1, limpias.length)) * 100) },
     });
   } catch (error) {
