@@ -6,9 +6,9 @@
 //                            (créditos comprados en platform.deepseek.com)
 //   AI_PROVIDER=openrouter → OpenRouter con modelos ":free" gratuitos
 //
-// Sin AI_PROVIDER se deduce de OPENROUTER_BASE_URL (si contiene
-// "deepseek" se usa DeepSeek) y, si no, se mantiene OpenRouter por
-// compatibilidad con lo que ya estaba configurado.
+// Sin AI_PROVIDER: si existe DEEPSEEK_API_KEY se usa DeepSeek; si no,
+// se comprueba OPENROUTER_BASE_URL (si contiene "deepseek") y, por
+// defecto, se mantiene OpenRouter por compatibilidad.
 //
 // Variables:
 //   DEEPSEEK_API_KEY / DEEPSEEK_MODEL / DEEPSEEK_BASE_URL
@@ -21,7 +21,10 @@ function esDeepSeek() {
   if (p === "deepseek") return true;
   if (p === "openrouter" || p === "free") return false;
   if (String(process.env.OPENROUTER_BASE_URL || "").includes("deepseek")) return true;
-  return false;
+  // Sin AI_PROVIDER explícito: si hay clave de DeepSeek configurada,
+  // se usa DeepSeek (es el proveedor principal). Para volver a los
+  // modelos gratis de OpenRouter basta con AI_PROVIDER=openrouter.
+  return String(process.env.DEEPSEEK_API_KEY || "").trim().length > 10;
 }
 
 function url() {
